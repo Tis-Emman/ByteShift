@@ -80,7 +80,7 @@ function CommentItem({ comment, c, dark }: { comment: Comment; c: ReturnType<typ
         {comment.depth > 0 && (
           <div style={{
             width: 2, minHeight: "100%", background: barColor + "40",
-            marginRight: 16, marginLeft: comment.depth * 16, borderRadius: 1,
+            marginRight: 16, marginLeft: Math.min(comment.depth, 4) * 16, borderRadius: 1,
             flexShrink: 0,
           }} />
         )}
@@ -232,10 +232,19 @@ function PostViewer() {
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: ${c.scrollTrackBg}; }
         ::-webkit-scrollbar-thumb { background: ${c.scrollThumbBg}; border-radius: 3px; }
+        @media (max-width: 768px) {
+          .post-header { padding: 0 16px !important; }
+          .post-container { padding: 20px 16px 60px !important; }
+          .post-card { padding: 24px 18px !important; }
+          .post-title { font-size: 20px !important; }
+          .post-stats { flex-wrap: wrap !important; gap: 12px !important; }
+          .post-stats a { margin-left: 0 !important; }
+          .comment-indent { margin-left: 8px !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <header style={{
+      <header className="post-header" style={{
         position: "sticky", top: 0, zIndex: 100,
         background: c.navBg,
         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
@@ -282,7 +291,7 @@ function PostViewer() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 780, margin: "0 auto", padding: "32px 24px 80px" }}>
+      <div className="post-container" style={{ maxWidth: 780, margin: "0 auto", padding: "32px 24px 80px" }}>
         {/* Loading */}
         {loading && (
           <div>
@@ -315,7 +324,7 @@ function PostViewer() {
         {!loading && !error && post && (
           <>
             {/* Post card */}
-            <article style={{
+            <article className="post-card" style={{
               background: c.surface,
               border: `1px solid ${c.borderLight}`,
               borderRadius: 16,
@@ -354,7 +363,7 @@ function PostViewer() {
               </div>
 
               {/* Title */}
-              <h1 style={{
+              <h1 className="post-title" style={{
                 fontSize: 26, fontWeight: 800, color: c.text,
                 fontFamily: "'Space Grotesk', sans-serif",
                 lineHeight: 1.3, margin: "0 0 20px",
@@ -408,7 +417,7 @@ function PostViewer() {
                 display: "flex", alignItems: "center", gap: 24,
                 marginTop: 24, paddingTop: 20,
                 borderTop: `1px solid ${c.borderLight}`,
-              }}>
+              }} className="post-stats">
                 <div style={{
                   display: "flex", alignItems: "center", gap: 6,
                   fontSize: 13, fontWeight: 600, color: c.text,

@@ -112,10 +112,18 @@ export default function TechFeed() {
         .feed-card:hover { transform: translateY(-2px); box-shadow: ${c.cardShadowHover}; }
         .sub-pill { transition: all 0.2s; cursor: pointer; }
         .sort-btn { transition: all 0.2s; cursor: pointer; }
+        @media (max-width: 768px) {
+          .feed-header { padding: 0 16px !important; }
+          .feed-container { padding: 20px 16px 60px !important; }
+          .feed-card { padding: 16px !important; }
+          .feed-vote { display: none !important; }
+          .feed-meta { font-size: 10px !important; }
+          .feed-title { font-size: 14px !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <header style={{
+      <header className="feed-header" style={{
         position: "sticky", top: 0, zIndex: 100,
         background: c.navBg,
         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
@@ -172,7 +180,7 @@ export default function TechFeed() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px 80px" }}>
+      <div className="feed-container" style={{ maxWidth: 900, margin: "0 auto", padding: "32px 24px 80px" }}>
         {/* Subreddit pills */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
           {SUBREDDITS.map((sub) => (
@@ -271,7 +279,7 @@ export default function TechFeed() {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
                   {/* Vote count */}
-                  <div style={{
+                  <div className="feed-vote" style={{
                     display: "flex", flexDirection: "column", alignItems: "center",
                     minWidth: 48, paddingTop: 2,
                   }}>
@@ -305,7 +313,7 @@ export default function TechFeed() {
                       }}>u/{post.author}</span>
                     </div>
 
-                    <h3 style={{
+                    <h3 className="feed-title" style={{
                       fontSize: 16, fontWeight: 700, color: c.text,
                       fontFamily: "'Space Grotesk', sans-serif",
                       lineHeight: 1.4, margin: "0 0 10px",

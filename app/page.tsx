@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Zap, Terminal, Bot, Sparkles, Package, GitBranch, Moon, Sun } from "lucide-react";
+import { Zap, Terminal, Bot, Sparkles, Package, GitBranch, Moon, Sun, Menu, X } from "lucide-react";
 import { useTheme, darkColors } from "./theme-context";
 
 function AnimateIn({ children, className = "fade-up", delay = 0, style }: {
@@ -388,6 +388,7 @@ function ToolCard({ tool, index }: { tool: typeof DEV_TOOLS[number]; index: numb
 
 export default function TechBlogHome() {
   const [activeCategory, setActiveCategory] = useState("All");
+  const [mobileMenu, setMobileMenu] = useState(false);
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   const c = darkColors(dark);
@@ -435,6 +436,39 @@ export default function TechBlogHome() {
         .nav-link:hover::after { width:100%; }
         input:focus { border-color: ${dark ? "#94a3b8" : "#0f172a"} !important; box-shadow: 0 0 0 3px ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} !important; }
         .footer-link:hover { color: ${dark ? "#000" : "#fff"} !important; }
+
+        /* Mobile nav */
+        .mobile-menu-btn { display: none; background: none; border: none; cursor: pointer; color: ${c.text}; padding: 4px; }
+
+        @media (max-width: 768px) {
+          .nav-desktop { display: none !important; }
+          .mobile-menu-btn { display: flex !important; align-items: center; }
+          .mobile-nav { display: flex !important; flex-direction: column; position: fixed; top: 72px; left: 0; right: 0; bottom: 0; background: ${c.navBg}; padding: 24px; gap: 0; z-index: 99; border-top: 1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}; }
+          .mobile-nav .nav-link { font-size: 18px !important; padding: 16px 0 !important; border-bottom: 1px solid ${c.border}; }
+          .mobile-nav .nav-link::after { display: none; }
+          .hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+          .hero-section { padding: 100px 20px 60px !important; }
+          .hero-h1 { font-size: clamp(28px, 8vw, 42px) !important; }
+          .hero-desc { font-size: 15px !important; }
+          .hero-stats { gap: 16px !important; }
+          .hero-stat-value { font-size: 16px !important; }
+          .hero-card { max-width: 100% !important; }
+          .section-pad { padding: 48px 20px !important; }
+          .section-h2 { font-size: 24px !important; }
+          .article-grid { grid-template-columns: 1fr !important; }
+          .tool-grid { grid-template-columns: 1fr !important; }
+          .footer-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+          .footer-bottom { flex-direction: column !important; gap: 8px !important; text-align: center; }
+          .nav-bar { padding: 0 16px !important; }
+          .cta-buttons { flex-direction: column !important; }
+          .cta-buttons a { text-align: center; justify-content: center; }
+        }
+
+        @media (max-width: 480px) {
+          .hero-h1 { font-size: 28px !important; }
+          .hero-stats { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .avatar-stack { display: none !important; }
+        }
       `}</style>
 
       {/* BG grid */}
@@ -449,7 +483,7 @@ export default function TechBlogHome() {
       }} />
 
       {/* NAVBAR */}
-      <nav style={{
+      <nav className="nav-bar" style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         padding: "0 48px", height: 72,
         background: c.navBg,
@@ -469,13 +503,12 @@ export default function TechBlogHome() {
           }} />
         </a>
 
-        {/* Nav links */}
-        <div style={{ display: "flex", gap: 36, alignItems: "center" }}>
+        {/* Desktop nav links */}
+        <div className="nav-desktop" style={{ display: "flex", gap: 36, alignItems: "center" }}>
           {["Trending", "Dev Setup", "Lab"].map((l) => (
             <a key={l} href={`#${l === "Trending" ? "news" : l.toLowerCase().replace(" ", "-")}`} className="nav-link">{l}</a>
           ))}
           <a href="/feed" className="nav-link">Tech Feed</a>
-          {/* Dark mode toggle */}
           <button
             onClick={toggle}
             aria-label="Toggle theme"
@@ -498,25 +531,51 @@ export default function TechBlogHome() {
             transition: "all 0.3s",
           }}>Get Started</a>
         </div>
+
+        {/* Mobile menu buttons */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={toggle} className="mobile-menu-btn" aria-label="Toggle theme">
+            {dark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button onClick={() => setMobileMenu(!mobileMenu)} className="mobile-menu-btn" aria-label="Menu">
+            {mobileMenu ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
       </nav>
 
+      {/* Mobile nav overlay */}
+      {mobileMenu && (
+        <div className="mobile-nav" style={{ display: "none" }}>
+          {["Trending", "Dev Setup", "Lab"].map((l) => (
+            <a key={l} href={`#${l === "Trending" ? "news" : l.toLowerCase().replace(" ", "-")}`} className="nav-link" onClick={() => setMobileMenu(false)}>{l}</a>
+          ))}
+          <a href="/feed" className="nav-link" onClick={() => setMobileMenu(false)}>Tech Feed</a>
+          <a href="/signup" onClick={() => setMobileMenu(false)} style={{
+            marginTop: 16, padding: "14px 24px", borderRadius: 10,
+            background: c.btnBg, color: c.btnText,
+            fontSize: 15, fontWeight: 700, textDecoration: "none",
+            fontFamily: "'DM Sans', sans-serif", textAlign: "center",
+          }}>Get Started</a>
+        </div>
+      )}
+
       {/* HERO */}
-      <section style={{
+      <section className="hero-section" style={{
         position: "relative", zIndex: 1, padding: "140px 40px 100px",
         maxWidth: 1200, margin: "0 auto",
       }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 72, alignItems: "center" }}>
+        <div className="hero-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 72, alignItems: "center" }}>
 
           {/* LEFT COLUMN */}
           <div className="slide-left">
-            <h1 style={{
+            <h1 className="hero-h1" style={{
               fontSize: "clamp(38px, 5.5vw, 66px)", fontWeight: 800, lineHeight: 1.06,
               fontFamily: "'Space Grotesk', sans-serif", margin: "0 0 20px",
               letterSpacing: "-0.03em", color: c.text, transition: "color 0.3s",
             }}>
               Navigate the<br />Digital Frontier
             </h1>
-            <p style={{
+            <p className="hero-desc" style={{
               fontSize: 17, color: c.textSecondary, lineHeight: 1.65,
               maxWidth: 460, margin: "0 0 32px", fontFamily: "'DM Sans', sans-serif",
             }}>
@@ -524,7 +583,7 @@ export default function TechBlogHome() {
             </p>
 
             {/* CTA buttons */}
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 40 }}>
+            <div className="cta-buttons" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 40 }}>
               <a href="#news" style={{
                 padding: "13px 24px", borderRadius: 10,
                 background: c.btnBg, color: c.btnText,
@@ -544,9 +603,9 @@ export default function TechBlogHome() {
             </div>
 
             {/* Stats row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
+            <div className="hero-stats" style={{ display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
               {/* Avatar stack */}
-              <div style={{ display: "flex" }}>
+              <div className="avatar-stack" style={{ display: "flex" }}>
                 {["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"].map((color, i) => (
                   <div key={i} style={{
                     width: 33, height: 33, borderRadius: "50%",
@@ -667,7 +726,7 @@ export default function TechBlogHome() {
 
       {/* NEWS SECTION */}
       <div style={{ position: "relative", zIndex: 1, background: c.surface, transition: "background 0.3s" }}>
-      <section id="news" style={{ padding: "60px 40px 80px", maxWidth: 1200, margin: "0 auto" }}>
+      <section id="news" className="section-pad" style={{ padding: "60px 40px 80px", maxWidth: 1200, margin: "0 auto" }}>
         <AnimateIn className="fade-up">
         <div style={{ marginBottom: 40 }}>
           <div style={{
@@ -677,7 +736,7 @@ export default function TechBlogHome() {
           <h2 style={{
             fontSize: 32, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
             letterSpacing: "-0.01em", margin: "0 0 24px", color: c.text,
-          }}>What the dev world is talking about</h2>
+          }} className="section-h2">What the dev world is talking about</h2>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {CATEGORIES.map((cat) => (
               <CategoryPill key={cat} label={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} />
@@ -688,7 +747,7 @@ export default function TechBlogHome() {
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
           gap: 24,
-        }}>
+        }} className="article-grid">
           {filtered.map((a, i) => <AnimateIn key={a.id} className="fade-up" delay={0.1 * i}><ArticleCard article={a} index={i} /></AnimateIn>)}
         </div>
         {filtered.length === 0 && (
@@ -701,7 +760,7 @@ export default function TechBlogHome() {
 
       {/* DEV SETUP SECTION */}
       <div style={{ position: "relative", zIndex: 1, background: c.surface, transition: "background 0.3s" }}>
-      <section id="dev-setup" style={{
+      <section id="dev-setup" className="section-pad" style={{
         padding: "80px 40px", maxWidth: 1200, margin: "0 auto",
       }}>
         <AnimateIn className="fade-up">
@@ -710,7 +769,7 @@ export default function TechBlogHome() {
             fontSize: 12, fontWeight: 600, color: "#3b82f6", letterSpacing: 2,
             textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 12,
           }}>Toolbox</div>
-          <h2 style={{
+          <h2 className="section-h2" style={{
             fontSize: 32, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
             letterSpacing: "-0.01em", margin: "0 0 12px", color: c.text,
           }}>Essential tools to level up your workflow</h2>
@@ -721,7 +780,7 @@ export default function TechBlogHome() {
         </AnimateIn>
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 20,
-        }}>
+        }} className="tool-grid">
           {DEV_TOOLS.map((t, i) => <AnimateIn key={t.name} className="scale-in" delay={0.08 * i}><ToolCard tool={t} index={i} /></AnimateIn>)}
         </div>
       </section>
@@ -729,7 +788,7 @@ export default function TechBlogHome() {
 
       {/* LAB SECTION */}
       <div style={{ position: "relative", zIndex: 1, background: c.surface, transition: "background 0.3s" }}>
-      <section id="lab" style={{
+      <section id="lab" className="section-pad" style={{
         padding: "80px 40px", maxWidth: 900, margin: "0 auto",
       }}>
         <AnimateIn className="fade-up">
@@ -738,7 +797,7 @@ export default function TechBlogHome() {
             fontSize: 12, fontWeight: 600, color: "#f59e0b", letterSpacing: 2,
             textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 12,
           }}>The Lab</div>
-          <h2 style={{
+          <h2 className="section-h2" style={{
             fontSize: 32, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
             letterSpacing: "-0.01em", margin: "0 0 12px", color: c.text,
           }}>How Fast Can You Type?</h2>
@@ -755,11 +814,11 @@ export default function TechBlogHome() {
 
       {/* FOOTER */}
       <div style={{ position: "relative", zIndex: 1, background: dark ? "#fefefe" : "#000", transition: "background 0.3s" }}>
-      <footer style={{
+      <footer className="section-pad" style={{
         padding: "60px 40px 40px", maxWidth: 1200, margin: "0 auto",
       }}>
         <AnimateIn className="fade-up">
-        <div style={{
+        <div className="footer-grid" style={{
           display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 48,
         }}>
           <div>
@@ -801,7 +860,7 @@ export default function TechBlogHome() {
         <div style={{
           marginTop: 48, paddingTop: 24, borderTop: dark ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.15)",
           display: "flex", justifyContent: "space-between", alignItems: "center",
-        }}>
+        }} className="footer-bottom">
           <span style={{ fontSize: 12, color: dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.4)", fontFamily: "'JetBrains Mono', monospace" }}>
             © 2026 ByteShift. All rights reserved.
           </span>

@@ -31,10 +31,15 @@ export default function SignIn() {
         .auth-input { transition: border-color 0.2s, box-shadow 0.2s, background 0.3s, color 0.3s; }
         .auth-btn { transition: background 0.2s, transform 0.1s; }
         .auth-btn:active { transform: scale(0.98); }
+        @media (max-width: 768px) {
+          .auth-visual { display: none !important; }
+          .auth-form { padding: 24px 20px !important; }
+          .auth-form h1 { font-size: 24px !important; }
+        }
       `}</style>
 
       {/* Left - Visual */}
-      <div style={{
+      <div className="auth-visual" style={{
         flex: 1, background: c.bgAlt,
         display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center",
@@ -63,7 +68,7 @@ export default function SignIn() {
       </div>
 
       {/* Right - Form */}
-      <div style={{
+      <div className="auth-form" style={{
         flex: 1, display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center",
         padding: "40px 24px", background: c.surface,
