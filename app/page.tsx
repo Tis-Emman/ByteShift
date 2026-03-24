@@ -434,7 +434,7 @@ export default function TechBlogHome() {
         .nav-link::after { content:''; position:absolute; bottom:0; left:0; width:0; height:1.5px; background:${c.text}; transition:width 0.25s; }
         .nav-link:hover::after { width:100%; }
         input:focus { border-color: ${dark ? "#94a3b8" : "#0f172a"} !important; box-shadow: 0 0 0 3px ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} !important; }
-        .footer-link:hover { color: #fff !important; }
+        .footer-link:hover { color: ${dark ? "#000" : "#fff"} !important; }
       `}</style>
 
       {/* BG grid */}
@@ -457,17 +457,24 @@ export default function TechBlogHome() {
         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         transition: "background 0.3s, border-color 0.3s",
+        overflow: "hidden",
       }}>
         {/* Logo */}
         <a href="#" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
-          <img src="/logo.png" alt="ByteShift" style={{ height: 95, filter: c.logoFilter, transition: "filter 0.3s" }} />
+          <img src="/logo.png" alt="ByteShift" style={{
+            height: 95,
+            filter: dark ? "invert(1)" : "none",
+            mixBlendMode: dark ? "screen" : "multiply",
+            transition: "filter 0.3s",
+          }} />
         </a>
 
         {/* Nav links */}
         <div style={{ display: "flex", gap: 36, alignItems: "center" }}>
-          {["Trending", "Dev Setup", "Lab", "About"].map((l) => (
+          {["Trending", "Dev Setup", "Lab"].map((l) => (
             <a key={l} href={`#${l === "Trending" ? "news" : l.toLowerCase().replace(" ", "-")}`} className="nav-link">{l}</a>
           ))}
+          <a href="/feed" className="nav-link">Tech Feed</a>
           {/* Dark mode toggle */}
           <button
             onClick={toggle}
@@ -747,7 +754,7 @@ export default function TechBlogHome() {
       </div>
 
       {/* FOOTER */}
-      <div style={{ position: "relative", zIndex: 1, background: "#000" }}>
+      <div style={{ position: "relative", zIndex: 1, background: dark ? "#fefefe" : "#000", transition: "background 0.3s" }}>
       <footer style={{
         padding: "60px 40px 40px", maxWidth: 1200, margin: "0 auto",
       }}>
@@ -757,44 +764,48 @@ export default function TechBlogHome() {
         }}>
           <div>
             <div style={{ marginBottom: 16 }}>
-              <img src="/logo.png" alt="ByteShift" style={{ height: 100, filter: "invert(1)" }} />
+              <img src="/logo.png" alt="ByteShift" style={{
+                height: 100,
+                filter: dark ? "none" : "invert(1)",
+                mixBlendMode: dark ? "multiply" : "screen",
+              }} />
             </div>
-            <p style={{ fontSize: 13.5, color: "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 340 }}>
+            <p style={{ fontSize: 13.5, color: dark ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)", lineHeight: 1.7, maxWidth: 340 }}>
               Navigating the digital frontier — covering AI developments, honest hardware reviews, gaming culture, and productivity strategies for the people who build the future.
             </p>
           </div>
           <div>
             <h4 style={{
-              fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: 1.5,
+              fontSize: 12, fontWeight: 600, color: dark ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.5)", letterSpacing: 1.5,
               textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 16,
             }}>Quick Links</h4>
             {["Trending", "Dev Setup", "Lab", "About"].map((l) => (
               <a key={l} href="#" className="footer-link" style={{
-                display: "block", fontSize: 14, color: "rgba(255,255,255,0.7)", textDecoration: "none",
+                display: "block", fontSize: 14, color: dark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.7)", textDecoration: "none",
                 marginBottom: 10, transition: "color 0.2s",
               }}>{l}</a>
             ))}
           </div>
           <div>
             <h4 style={{
-              fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.5)", letterSpacing: 1.5,
+              fontSize: 12, fontWeight: 600, color: dark ? "rgba(0,0,0,0.4)" : "rgba(255,255,255,0.5)", letterSpacing: 1.5,
               textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 16,
             }}>Legal</h4>
             {["Privacy Policy", "Terms of Service"].map((l) => (
               <a key={l} href="#" className="footer-link" style={{
-                display: "block", fontSize: 14, color: "rgba(255,255,255,0.7)", textDecoration: "none", marginBottom: 10, transition: "color 0.2s",
+                display: "block", fontSize: 14, color: dark ? "rgba(0,0,0,0.6)" : "rgba(255,255,255,0.7)", textDecoration: "none", marginBottom: 10, transition: "color 0.2s",
               }}>{l}</a>
             ))}
           </div>
         </div>
         <div style={{
-          marginTop: 48, paddingTop: 24, borderTop: "1px solid rgba(255,255,255,0.15)",
+          marginTop: 48, paddingTop: 24, borderTop: dark ? "1px solid rgba(0,0,0,0.1)" : "1px solid rgba(255,255,255,0.15)",
           display: "flex", justifyContent: "space-between", alignItems: "center",
         }}>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: 12, color: dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.4)", fontFamily: "'JetBrains Mono', monospace" }}>
             © 2026 ByteShift. All rights reserved.
           </span>
-          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", fontFamily: "'JetBrains Mono', monospace" }}>
+          <span style={{ fontSize: 12, color: dark ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.4)", fontFamily: "'JetBrains Mono', monospace" }}>
             Built with Next.js
           </span>
         </div>

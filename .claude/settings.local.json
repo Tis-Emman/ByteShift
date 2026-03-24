@@ -7,7 +7,8 @@
       "Bash(bash \"C:/Users/user/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.5/skills/brainstorming/scripts/start-server.sh\" --project-dir \"e:/Self Project/byteshift/my-app\")",
       "Bash(node -e \"const l = require\\(''lucide-react''\\); console.log\\(''Container:'', !!l.Container, ''Box:'', !!l.Box\\)\")",
       "Bash(node -e \"const l = require\\(''lucide-react''\\); console.log\\(''Container:'', ''Container'' in l, ''Box:'', ''Box'' in l\\)\")",
-      "Bash(find 'e:/Self Project/byteshift/my-app/node_modules/next/dist/docs/' -type f -name *.md)"
+      "Bash(find 'e:/Self Project/byteshift/my-app/node_modules/next/dist/docs/' -type f -name *.md)",
+      "Bash(npx next:*)"
     ]
   }
 }

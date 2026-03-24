@@ -20,7 +20,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (mounted) localStorage.setItem("byteshift-theme", theme);
+    if (mounted) {
+      localStorage.setItem("byteshift-theme", theme);
+      const bg = theme === "dark" ? "#0a0a0f" : "#ffffff";
+      document.documentElement.style.background = bg;
+      document.body.style.background = bg;
+      document.documentElement.style.transition = "background 0.3s";
+      document.body.style.transition = "background 0.3s";
+    }
   }, [theme, mounted]);
 
   const toggle = () => setTheme((t) => (t === "light" ? "dark" : "light"));
@@ -50,7 +57,7 @@ export function darkColors(dark: boolean) {
     border: dark ? "#1e293b" : "#e2e8f0",
     borderLight: dark ? "#1e293b" : "#f1f5f9",
     inputBg: dark ? "#0f172a" : "#f8fafc",
-    navBg: dark ? "#0a0a0f" : "#fefefe",
+    navBg: dark ? "#0f0e13" : "#fefefe",
     cardShadow: dark ? "0 2px 12px rgba(0,0,0,0.3)" : "0 2px 12px rgba(0,0,0,0.05)",
     cardShadowHover: dark ? "0 20px 60px rgba(0,0,0,0.4)" : "0 20px 60px rgba(0,0,0,0.10)",
     heroCardShadow: dark ? "0 12px 56px rgba(0,0,0,0.4), 0 2px 16px rgba(0,0,0,0.3)" : "0 12px 56px rgba(0,0,0,0.09), 0 2px 16px rgba(0,0,0,0.05)",
