@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2 } from "lucide-react";
 import { useTheme, darkColors } from "../theme-context";
+import { type BookmarkItem, getBookmarks, isBookmarked, toggleBookmark, removeBookmark } from "../bookmarks";
 
 type RedditPost = {
   id: string;
@@ -73,7 +74,7 @@ function formatScore(n: number): string {
 }
 
 export default function TechFeed() {
-  const [source, setSource] = useState<"reddit" | "github">("reddit");
+  const [source, setSource] = useState<"reddit" | "github" | "saved">("reddit");
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,9 +83,59 @@ export default function TechFeed() {
   const [sort, setSort] = useState<"hot" | "new" | "top">("hot");
   const [ghLang, setGhLang] = useState("");
   const [ghSince, setGhSince] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [savedItems, setSavedItems] = useState<BookmarkItem[]>([]);
+  const [bookmarkTick, setBookmarkTick] = useState(0);
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   const c = darkColors(dark);
+
+  // Reload saved items when switching to saved tab or after bookmark changes
+  useEffect(() => {
+    setSavedItems(getBookmarks());
+  }, [source, bookmarkTick]);
+
+  const handleBookmarkReddit = (e: React.MouseEvent, post: RedditPost) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleBookmark({
+      id: `reddit_${post.id}`,
+      type: "reddit",
+      title: post.title,
+      url: post.url,
+      savedAt: Date.now(),
+      permalink: post.permalink,
+      subreddit: post.subreddit,
+      author: post.author,
+      score: post.score,
+      num_comments: post.num_comments,
+      selftext: post.selftext,
+    });
+    setBookmarkTick((t) => t + 1);
+  };
+
+  const handleBookmarkGithub = (e: React.MouseEvent, repo: GitHubRepo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleBookmark({
+      id: `github_${repo.name}`,
+      type: "github",
+      title: repo.name.split("/")[1],
+      url: repo.url,
+      savedAt: Date.now(),
+      name: repo.name,
+      description: repo.description,
+      language: repo.language || undefined,
+      languageColor: repo.languageColor,
+      stars: repo.stars,
+      forks: repo.forks,
+    });
+    setBookmarkTick((t) => t + 1);
+  };
+
+  const handleRemoveSaved = (id: string) => {
+    removeBookmark(id);
+    setBookmarkTick((t) => t + 1);
+  };
 
   const fetchPosts = async (sub: string, sortBy: string) => {
     setLoading(true);
@@ -199,7 +250,9 @@ export default function TechFeed() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {source === "reddit"
               ? <Rss size={20} color={dark ? "#f59e0b" : "#0f172a"} />
-              : <Github size={20} color={dark ? "#f59e0b" : "#0f172a"} />
+              : source === "github"
+              ? <Github size={20} color={dark ? "#f59e0b" : "#0f172a"} />
+              : <BookmarkCheck size={20} color={dark ? "#f59e0b" : "#0f172a"} />
             }
             <span style={{
               fontSize: 18, fontWeight: 700,
@@ -277,6 +330,30 @@ export default function TechFeed() {
             }}
           >
             <Github size={15} /> GitHub Trending
+          </button>
+          <button
+            className="source-btn"
+            onClick={() => setSource("saved")}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 20px", borderRadius: 9,
+              border: "none",
+              background: source === "saved" ? c.btnBg : "transparent",
+              color: source === "saved" ? c.btnText : c.textMuted,
+              fontSize: 13, fontWeight: 700,
+              fontFamily: "'Space Grotesk', sans-serif",
+              position: "relative",
+            }}
+          >
+            <BookmarkCheck size={15} /> Saved
+            {savedItems.length > 0 && (
+              <span style={{
+                fontSize: 10, fontWeight: 800, lineHeight: 1,
+                padding: "2px 6px", borderRadius: 10,
+                background: dark ? "#f59e0b" : "#3b82f6",
+                color: "#fff",
+              }}>{savedItems.length}</span>
+            )}
           </button>
         </div>
 
@@ -369,7 +446,7 @@ export default function TechFeed() {
         )}
 
         {/* Loading state */}
-        {loading && (
+        {loading && source !== "saved" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {[...Array(6)].map((_, i) => (
               <div key={i} style={{
@@ -386,7 +463,7 @@ export default function TechFeed() {
         )}
 
         {/* Error */}
-        {error && (
+        {error && source !== "saved" && (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             color: c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
@@ -440,6 +517,18 @@ export default function TechFeed() {
                         fontFamily: "'JetBrains Mono', monospace",
                         textTransform: "uppercase", letterSpacing: 0.5,
                       }}>r/{post.subreddit}</span>
+                      <button
+                        onClick={(e) => handleBookmarkReddit(e, post)}
+                        style={{
+                          marginLeft: "auto", background: "none", border: "none",
+                          cursor: "pointer", padding: 4, display: "flex",
+                          color: isBookmarked(`reddit_${post.id}`) ? (dark ? "#f59e0b" : "#3b82f6") : c.textMuted,
+                          transition: "color 0.2s",
+                        }}
+                        aria-label={isBookmarked(`reddit_${post.id}`) ? "Remove bookmark" : "Bookmark"}
+                      >
+                        {isBookmarked(`reddit_${post.id}`) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                      </button>
                       {post.link_flair_text && (
                         <span style={{
                           fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
@@ -544,6 +633,18 @@ export default function TechFeed() {
                         color: c.textSecondary,
                         fontFamily: "'JetBrains Mono', monospace",
                       }}>#{repo.rank}</span>
+                      <button
+                        onClick={(e) => handleBookmarkGithub(e, repo)}
+                        style={{
+                          marginLeft: "auto", background: "none", border: "none",
+                          cursor: "pointer", padding: 4, display: "flex",
+                          color: isBookmarked(`github_${repo.name}`) ? (dark ? "#f59e0b" : "#3b82f6") : c.textMuted,
+                          transition: "color 0.2s",
+                        }}
+                        aria-label={isBookmarked(`github_${repo.name}`) ? "Remove bookmark" : "Bookmark"}
+                      >
+                        {isBookmarked(`github_${repo.name}`) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                      </button>
                     </div>
 
                     <h3 className="feed-title" style={{
@@ -608,8 +709,186 @@ export default function TechFeed() {
           </div>
         )}
 
+        {/* Saved items */}
+        {source === "saved" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {savedItems.length === 0 && (
+              <div style={{
+                textAlign: "center", padding: "60px 20px",
+                color: c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
+              }}>
+                <BookmarkCheck size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
+                <br />
+                No saved items yet. Bookmark posts or repos to see them here.
+              </div>
+            )}
+            {savedItems.map((item) => (
+              <div
+                key={item.id}
+                className="feed-card"
+                style={{
+                  display: "block",
+                  background: c.surface,
+                  border: `1px solid ${c.borderLight}`,
+                  borderRadius: 14,
+                  padding: "20px 24px",
+                  boxShadow: c.cardShadow,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                  {/* Type badge */}
+                  <div className="feed-vote" style={{
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    minWidth: 48, paddingTop: 2,
+                  }}>
+                    {item.type === "reddit" ? (
+                      <>
+                        <ArrowUp size={16} color={c.textMuted} />
+                        <span style={{
+                          fontSize: 14, fontWeight: 700, color: c.text,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}>{formatScore(item.score || 0)}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Star size={16} color={dark ? "#f59e0b" : "#eab308"} />
+                        <span style={{
+                          fontSize: 14, fontWeight: 700, color: c.text,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                        }}>{formatScore(item.stars || 0)}</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    {/* Meta row */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                        background: item.type === "reddit"
+                          ? (dark ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.1)")
+                          : (dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"),
+                        color: item.type === "reddit" ? "#ef4444" : c.textSecondary,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        textTransform: "uppercase", letterSpacing: 0.5,
+                      }}>{item.type === "reddit" ? "Reddit" : "GitHub"}</span>
+                      {item.type === "reddit" && item.subreddit && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, color: dark ? "#f59e0b" : "#3b82f6",
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}>r/{item.subreddit}</span>
+                      )}
+                      {item.type === "github" && item.name && (
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, color: dark ? "#f59e0b" : "#3b82f6",
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}>{item.name}</span>
+                      )}
+                      <span style={{ fontSize: 11, color: c.textMuted }}>·</span>
+                      <span style={{
+                        fontSize: 11, color: c.textMuted,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}>saved {timeAgo(Math.floor(item.savedAt / 1000))}</span>
+
+                      {/* Remove button */}
+                      <button
+                        onClick={() => handleRemoveSaved(item.id)}
+                        style={{
+                          marginLeft: "auto", background: "none", border: "none",
+                          cursor: "pointer", padding: 4, display: "flex",
+                          color: c.textMuted, transition: "color 0.2s",
+                        }}
+                        aria-label="Remove bookmark"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {/* Title as link */}
+                    {item.type === "reddit" && item.permalink ? (
+                      <Link href={`/feed/post?permalink=${encodeURIComponent(item.permalink)}`} style={{ textDecoration: "none" }}>
+                        <h3 className="feed-title" style={{
+                          fontSize: 16, fontWeight: 700, color: c.text,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          lineHeight: 1.4, margin: "0 0 8px",
+                        }}>{item.title}</h3>
+                      </Link>
+                    ) : (
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                        <h3 className="feed-title" style={{
+                          fontSize: 16, fontWeight: 700, color: c.text,
+                          fontFamily: "'Space Grotesk', sans-serif",
+                          lineHeight: 1.4, margin: "0 0 8px",
+                        }}>{item.title}</h3>
+                      </a>
+                    )}
+
+                    {/* Description/selftext */}
+                    {(item.selftext || item.description) && (
+                      <p style={{
+                        fontSize: 13, color: c.textSecondary, lineHeight: 1.6,
+                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                        overflow: "hidden", margin: "0 0 10px",
+                      }}>{item.selftext || item.description}</p>
+                    )}
+
+                    {/* Bottom meta */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                      {item.type === "reddit" && (
+                        <span style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 12, color: c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}>
+                          <MessageSquare size={13} /> {item.num_comments || 0}
+                        </span>
+                      )}
+                      {item.type === "github" && item.language && (
+                        <span style={{
+                          display: "flex", alignItems: "center", gap: 6,
+                          fontSize: 12, color: c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}>
+                          <span style={{
+                            width: 10, height: 10, borderRadius: "50%",
+                            background: item.languageColor || c.textMuted,
+                            flexShrink: 0,
+                          }} />
+                          {item.language}
+                        </span>
+                      )}
+                      {item.type === "github" && (
+                        <span style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 12, color: c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                        }}>
+                          <GitFork size={13} /> {formatScore(item.forks || 0)}
+                        </span>
+                      )}
+                      <a
+                        href={item.type === "reddit" ? `https://reddit.com${item.permalink}` : item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 11, color: c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          textDecoration: "none", marginLeft: "auto",
+                        }}
+                      >
+                        <ExternalLink size={12} /> {item.type === "reddit" ? "reddit.com" : "github.com"}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Empty */}
-        {!loading && !error && ((source === "reddit" && posts.length === 0) || (source === "github" && repos.length === 0)) && (
+        {!loading && !error && source !== "saved" && ((source === "reddit" && posts.length === 0) || (source === "github" && repos.length === 0)) && (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             color: c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
