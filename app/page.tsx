@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Zap, Terminal, Bot, Sparkles, Package, GitBranch } from "lucide-react";
+import { Zap, Terminal, Bot, Sparkles, Package, GitBranch, Moon, Sun } from "lucide-react";
+import { useTheme, darkColors } from "./theme-context";
 
 function AnimateIn({ children, className = "fade-up", delay = 0, style }: {
   children: React.ReactNode;
@@ -227,23 +228,26 @@ function TypingTest() {
   const wpm = elapsed > 0 ? Math.round((correctChars / 5) / (elapsed / 60)) : 0;
   const accuracy = currentIndex > 0 ? Math.round(((currentIndex - errors) / currentIndex) * 100) : 100;
 
+  const { theme } = useTheme();
+  const cl = darkColors(theme === "dark");
+
   return (
-    <div style={{ background: "#fff", borderRadius: 16, padding: "32px 28px", border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+    <div style={{ background: cl.surface, borderRadius: 16, padding: "32px 28px", border: `1px solid ${cl.border}`, boxShadow: cl.cardShadow, transition: "all 0.3s" }}>
       <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
         {(["easy", "code"] as (keyof typeof WORD_SETS)[]).map((m) => (
           <button key={m} onClick={() => setMode(m)} style={{
-            padding: "8px 20px", borderRadius: 8, border: mode === m ? "1.5px solid #0f172a" : "1.5px solid #e2e8f0",
-            background: mode === m ? "#0f172a" : "#fff",
-            color: mode === m ? "#fff" : "#94a3b8", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", textTransform: "capitalize",
+            padding: "8px 20px", borderRadius: 8, border: mode === m ? `1.5px solid ${cl.btnBg}` : `1.5px solid ${cl.border}`,
+            background: mode === m ? cl.btnBg : cl.surface,
+            color: mode === m ? cl.btnText : cl.textMuted, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace", textTransform: "capitalize",
             transition: "all 0.2s",
           }}>{m}</button>
         ))}
       </div>
       <div style={{ minHeight: 100, marginBottom: 20, lineHeight: 2.2, fontFamily: "'JetBrains Mono', monospace", fontSize: 15, overflow: "hidden", maxHeight: 140, flexWrap: "wrap", wordBreak: "break-word" }}>
         {words.map((w, i) => {
-          let color = "#cbd5e1";
-          if (i < currentIndex) color = "#0f172a";
-          if (i === currentIndex) color = "#0f172a";
+          let color = theme === "dark" ? "#475569" : "#cbd5e1";
+          if (i < currentIndex) color = cl.text;
+          if (i === currentIndex) color = cl.text;
           return <span key={i} style={{ color, marginRight: 10, transition: "color 0.15s", textDecoration: i === currentIndex ? "underline" : "none", textUnderlineOffset: 6, display: "inline" }}>{w}</span>;
         })}
       </div>
@@ -254,27 +258,28 @@ function TypingTest() {
         disabled={finished}
         placeholder={finished ? "Done!" : "Start typing..."}
         style={{
-          width: "100%", padding: "14px 18px", borderRadius: 10, border: "1.5px solid #e2e8f0",
-          background: "#f8fafc", color: "#0f172a", fontSize: 15, fontFamily: "'JetBrains Mono', monospace",
-          outline: "none", boxSizing: "border-box", transition: "border-color 0.2s",
+          width: "100%", padding: "14px 18px", borderRadius: 10, border: `1.5px solid ${cl.border}`,
+          background: cl.inputBg, color: cl.text, fontSize: 15, fontFamily: "'JetBrains Mono', monospace",
+          outline: "none", boxSizing: "border-box", transition: "all 0.3s",
         }}
       />
       <div style={{ display: "flex", gap: 32, marginTop: 20, flexWrap: "wrap" }}>
         {[
-          { label: "WPM", value: wpm, color: "#0f172a" },
+        
+        { label: "WPM", value: wpm, color: cl.text },
           { label: "Accuracy", value: `${accuracy}%`, color: "#3b82f6" },
           { label: "Time", value: `${elapsed}s`, color: "#f59e0b" },
           { label: "Errors", value: errors, color: "#ef4444" },
         ].map((s) => (
           <div key={s.label} style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, color: s.color, fontFamily: "'Space Grotesk', sans-serif" }}>{s.value}</div>
-            <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{s.label}</div>
+            <div style={{ fontSize: 10, color: cl.textMuted, marginTop: 4, textTransform: "uppercase", letterSpacing: 1.5, fontWeight: 600 }}>{s.label}</div>
           </div>
         ))}
       </div>
       <button onClick={newTest} style={{
-        marginTop: 20, padding: "10px 24px", borderRadius: 8, border: "1.5px solid #e2e8f0",
-        background: "#fff", color: "#0f172a", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+        marginTop: 20, padding: "10px 24px", borderRadius: 8, border: `1.5px solid ${cl.border}`,
+        background: cl.surface, color: cl.text, cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
         transition: "all 0.2s",
       }}>↻ New Test</button>
     </div>
@@ -282,11 +287,13 @@ function TypingTest() {
 }
 
 function CategoryPill({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  const { theme } = useTheme();
+  const cl = darkColors(theme === "dark");
   return (
     <button onClick={onClick} style={{
-      padding: "7px 18px", borderRadius: 20, border: active ? "1px solid #0f172a" : "1px solid #e2e8f0",
-      background: active ? "rgba(0,0,0,0.08)" : "#fff",
-      color: active ? "#0f172a" : "#94a3b8", cursor: "pointer", fontSize: 13,
+      padding: "7px 18px", borderRadius: 20, border: active ? `1px solid ${cl.pillActiveBorder}` : `1px solid ${cl.border}`,
+      background: active ? cl.pillActiveBg : cl.surface,
+      color: active ? cl.pillActiveText : cl.textMuted, cursor: "pointer", fontSize: 13,
       fontFamily: "'DM Sans', sans-serif", fontWeight: 500, transition: "all 0.25s", whiteSpace: "nowrap",
     }}>{label}</button>
   );
@@ -294,17 +301,19 @@ function CategoryPill({ label, active, onClick }: { label: string; active: boole
 
 function ArticleCard({ article, index }: { article: typeof ARTICLES[number]; index: number }) {
   const [hovered, setHovered] = useState(false);
+  const { theme } = useTheme();
+  const cl = darkColors(theme === "dark");
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: "#fff",
-        border: "1px solid #e2e8f0",
+        background: cl.surface,
+        border: `1px solid ${cl.border}`,
         borderRadius: 16, overflow: "hidden", cursor: "pointer",
         transition: "all 0.35s cubic-bezier(0.4,0,0.2,1)",
         transform: hovered ? "translateY(-4px)" : "translateY(0)",
-        boxShadow: hovered ? "0 20px 60px rgba(0,0,0,0.10)" : "0 2px 12px rgba(0,0,0,0.05)",
+        boxShadow: hovered ? cl.cardShadowHover : cl.cardShadow,
         animationDelay: `${index * 80}ms`,
       }}
     >
@@ -315,24 +324,24 @@ function ArticleCard({ article, index }: { article: typeof ARTICLES[number]; ind
         }} />
         <div style={{
           position: "absolute", top: 12, left: 12, padding: "4px 12px", borderRadius: 6,
-          background: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
-          color: "#0f172a", fontSize: 11, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
+          background: theme === "dark" ? "rgba(0,0,0,0.75)" : "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)",
+          color: cl.text, fontSize: 11, fontWeight: 600, fontFamily: "'JetBrains Mono', monospace",
           letterSpacing: 0.5, textTransform: "uppercase",
         }}>{article.category}</div>
       </div>
       <div style={{ padding: "20px 20px 24px" }}>
         <h3 style={{
-          fontSize: 17, fontWeight: 700, color: "#0f172a", lineHeight: 1.4, margin: "0 0 10px",
+          fontSize: 17, fontWeight: 700, color: cl.text, lineHeight: 1.4, margin: "0 0 10px",
           fontFamily: "'Space Grotesk', 'DM Sans', sans-serif",
         }}>{article.title}</h3>
         <p style={{
-          fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: "0 0 16px",
+          fontSize: 13.5, color: cl.textSecondary, lineHeight: 1.6, margin: "0 0 16px",
           fontFamily: "'DM Sans', sans-serif",
           display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
         }}>{article.excerpt}</p>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>{article.date}</span>
-          <span style={{ fontSize: 12, color: "#0f172a", fontFamily: "'JetBrains Mono', monospace" }}>{article.readTime} read</span>
+          <span style={{ fontSize: 12, color: cl.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>{article.date}</span>
+          <span style={{ fontSize: 12, color: cl.text, fontFamily: "'JetBrains Mono', monospace" }}>{article.readTime} read</span>
         </div>
       </div>
     </div>
@@ -341,17 +350,19 @@ function ArticleCard({ article, index }: { article: typeof ARTICLES[number]; ind
 
 function ToolCard({ tool, index }: { tool: typeof DEV_TOOLS[number]; index: number }) {
   const [hovered, setHovered] = useState(false);
+  const { theme } = useTheme();
+  const cl = darkColors(theme === "dark");
   return (
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        background: hovered ? "#fafafa" : "#fff",
-        border: `1px solid ${hovered ? tool.color + "40" : "#e2e8f0"}`,
+        background: hovered ? cl.surfaceHover : cl.surface,
+        border: `1px solid ${hovered ? tool.color + "40" : cl.border}`,
         borderRadius: 16, padding: 24, cursor: "pointer",
         transition: "all 0.3s cubic-bezier(0.4,0,0.2,1)",
         transform: hovered ? "translateY(-2px)" : "translateY(0)",
-        boxShadow: hovered ? `0 8px 30px ${tool.color}18` : "0 2px 8px rgba(0,0,0,0.04)",
+        boxShadow: hovered ? `0 8px 30px ${tool.color}18` : cl.cardShadow,
       }}
     >
       <div style={{
@@ -360,11 +371,11 @@ function ToolCard({ tool, index }: { tool: typeof DEV_TOOLS[number]; index: numb
         marginBottom: 16, border: `1px solid ${tool.color}25`, color: tool.color,
       }}>{tool.icon}</div>
       <h4 style={{
-        fontSize: 16, fontWeight: 700, color: "#0f172a", margin: "0 0 8px",
+        fontSize: 16, fontWeight: 700, color: cl.text, margin: "0 0 8px",
         fontFamily: "'Space Grotesk', 'DM Sans', sans-serif",
       }}>{tool.name}</h4>
       <p style={{
-        fontSize: 13.5, color: "#64748b", lineHeight: 1.6, margin: 0,
+        fontSize: 13.5, color: cl.textSecondary, lineHeight: 1.6, margin: 0,
         fontFamily: "'DM Sans', sans-serif",
       }}>{tool.desc}</p>
       <div style={{
@@ -377,25 +388,29 @@ function ToolCard({ tool, index }: { tool: typeof DEV_TOOLS[number]; index: numb
 
 export default function TechBlogHome() {
   const [activeCategory, setActiveCategory] = useState("All");
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  const c = darkColors(dark);
 
   const filtered = activeCategory === "All" ? ARTICLES : ARTICLES.filter((a) => a.category === activeCategory);
 
   return (
     <div style={{
       minHeight: "100vh",
-      background: "transparent",
-      color: "#0f172a",
+      background: c.bg,
+      color: c.text,
       fontFamily: "'DM Sans', sans-serif",
       overflow: "hidden",
+      transition: "background 0.3s, color 0.3s",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
-        ::selection { background: rgba(0,0,0,0.15); color: #0f172a; }
+        ::selection { background: ${c.selectionBg}; color: ${c.selectionColor}; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #f8fafc; }
-        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: ${c.scrollTrackBg}; }
+        ::-webkit-scrollbar-thumb { background: ${c.scrollThumbBg}; border-radius: 3px; }
         @keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
         @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
         @keyframes slideInLeft { from { opacity:0; transform:translateX(-40px); } to { opacity:1; transform:translateX(0); } }
@@ -414,36 +429,38 @@ export default function TechBlogHome() {
         .stagger-4 { animation-delay: 0.4s; }
         .stagger-5 { animation-delay: 0.5s; }
         .stagger-6 { animation-delay: 0.6s; }
-        .nav-link { color:#64748b; text-decoration:none; font-size:14px; font-weight:500; transition:color 0.2s; padding:6px 0; position:relative; }
-        .nav-link:hover { color:#0f172a; }
-        .nav-link::after { content:''; position:absolute; bottom:0; left:0; width:0; height:1.5px; background:#0f172a; transition:width 0.25s; }
+        .nav-link { color:${c.textSecondary}; text-decoration:none; font-size:14px; font-weight:500; transition:color 0.2s; padding:6px 0; position:relative; }
+        .nav-link:hover { color:${c.text}; }
+        .nav-link::after { content:''; position:absolute; bottom:0; left:0; width:0; height:1.5px; background:${c.text}; transition:width 0.25s; }
         .nav-link:hover::after { width:100%; }
-        input:focus { border-color: #0f172a !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.1) !important; }
+        input:focus { border-color: ${dark ? "#94a3b8" : "#0f172a"} !important; box-shadow: 0 0 0 3px ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"} !important; }
         .footer-link:hover { color: #fff !important; }
       `}</style>
 
       {/* BG grid */}
       <div style={{
         position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: "linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px)",
+        backgroundImage: `linear-gradient(${c.gridLine} 1px, transparent 1px), linear-gradient(90deg, ${c.gridLine} 1px, transparent 1px)`,
         backgroundSize: "60px 60px",
         animation: "gridScroll 3s linear infinite",
         maskImage: "linear-gradient(to bottom, transparent, black 8%, black 92%, transparent)",
         WebkitMaskImage: "linear-gradient(to bottom, transparent, black 8%, black 92%, transparent)",
+        transition: "background-image 0.3s",
       }} />
 
       {/* NAVBAR */}
       <nav style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         padding: "0 48px", height: 72,
-        background: "#fefefe",
+        background: c.navBg,
         backdropFilter: "none",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
+        borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
+        transition: "background 0.3s, border-color 0.3s",
       }}>
         {/* Logo */}
         <a href="#" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
-          <img src="/logo.png" alt="ByteShift" style={{ height: 95 }} />
+          <img src="/logo.png" alt="ByteShift" style={{ height: 95, filter: c.logoFilter, transition: "filter 0.3s" }} />
         </a>
 
         {/* Nav links */}
@@ -451,12 +468,27 @@ export default function TechBlogHome() {
           {["Trending", "Dev Setup", "Lab", "About"].map((l) => (
             <a key={l} href={`#${l === "Trending" ? "news" : l.toLowerCase().replace(" ", "-")}`} className="nav-link">{l}</a>
           ))}
+          {/* Dark mode toggle */}
+          <button
+            onClick={toggle}
+            aria-label="Toggle theme"
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
+              border: `1px solid ${c.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: c.text,
+              transition: "all 0.3s",
+            }}
+          >
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
           <a href="/signup" style={{
             padding: "8px 20px", borderRadius: 8,
-            background: "#0f172a", color: "#fff",
+            background: c.btnBg, color: c.btnText,
             fontSize: 13.5, fontWeight: 600, textDecoration: "none",
             fontFamily: "'DM Sans', sans-serif",
-            transition: "background 0.2s",
+            transition: "all 0.3s",
           }}>Get Started</a>
         </div>
       </nav>
@@ -473,12 +505,12 @@ export default function TechBlogHome() {
             <h1 style={{
               fontSize: "clamp(38px, 5.5vw, 66px)", fontWeight: 800, lineHeight: 1.06,
               fontFamily: "'Space Grotesk', sans-serif", margin: "0 0 20px",
-              letterSpacing: "-0.03em", color: "#0f172a",
+              letterSpacing: "-0.03em", color: c.text, transition: "color 0.3s",
             }}>
               Navigate the<br />Digital Frontier
             </h1>
             <p style={{
-              fontSize: 17, color: "#64748b", lineHeight: 1.65,
+              fontSize: 17, color: c.textSecondary, lineHeight: 1.65,
               maxWidth: 460, margin: "0 0 32px", fontFamily: "'DM Sans', sans-serif",
             }}>
               Cut through the clutter — the latest in AI, hardware deep dives, developer tool breakdowns, and gaming culture. Handpicked for those who build and create.
@@ -488,19 +520,19 @@ export default function TechBlogHome() {
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 40 }}>
               <a href="#news" style={{
                 padding: "13px 24px", borderRadius: 10,
-                background: "#0f172a", color: "#fff",
+                background: c.btnBg, color: c.btnText,
                 fontWeight: 700, fontSize: 15, textDecoration: "none",
                 fontFamily: "'DM Sans', sans-serif",
                 display: "inline-flex", alignItems: "center", gap: 6,
-                transition: "background 0.2s",
+                transition: "all 0.3s",
               }}>Start Reading <span style={{ fontSize: 17 }}>›</span></a>
               <a href="#lab" style={{
                 padding: "13px 24px", borderRadius: 10,
-                background: "#fff", border: "1.5px solid #e2e8f0",
-                color: "#0f172a", fontWeight: 600, fontSize: 15, textDecoration: "none",
+                background: c.surface, border: `1.5px solid ${c.border}`,
+                color: c.text, fontWeight: 600, fontSize: 15, textDecoration: "none",
                 fontFamily: "'DM Sans', sans-serif",
-                boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                transition: "all 0.2s",
+                boxShadow: c.cardShadow,
+                transition: "all 0.3s",
               }}>Try the Lab</a>
             </div>
 
@@ -511,7 +543,7 @@ export default function TechBlogHome() {
                 {["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"].map((color, i) => (
                   <div key={i} style={{
                     width: 33, height: 33, borderRadius: "50%",
-                    background: color, border: "2.5px solid #fff",
+                    background: color, border: `2.5px solid ${c.surface}`,
                     marginLeft: i > 0 ? -9 : 0,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 11, fontWeight: 700, color: "#fff",
@@ -523,10 +555,10 @@ export default function TechBlogHome() {
                 ))}
                 <div style={{
                   width: 33, height: 33, borderRadius: "50%",
-                  background: "#f1f5f9", border: "2.5px solid #fff",
+                  background: dark ? "#1e293b" : "#f1f5f9", border: `2.5px solid ${c.surface}`,
                   marginLeft: -9,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 600, color: "#64748b",
+                  fontSize: 11, fontWeight: 600, color: c.textSecondary,
                   boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
                 }}>+</div>
               </div>
@@ -538,10 +570,10 @@ export default function TechBlogHome() {
               ].map((s) => (
                 <div key={s.label}>
                   <div style={{
-                    fontSize: 20, fontWeight: 800, color: "#0f172a",
+                    fontSize: 20, fontWeight: 800, color: c.text,
                     fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.2,
                   }}>{s.value}</div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{s.label}</div>
+                  <div style={{ fontSize: 12, color: c.textMuted, fontFamily: "'DM Sans', sans-serif", marginTop: 2 }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -550,28 +582,29 @@ export default function TechBlogHome() {
           {/* RIGHT COLUMN — Content Preview Card */}
           <AnimateIn className="slide-right" delay={0.2} style={{ display: "flex", justifyContent: "center" }}>
             <div style={{
-              background: "#fff",
+              background: c.surface,
               borderRadius: 20,
               padding: "36px 32px 28px",
-              boxShadow: "0 12px 56px rgba(0,0,0,0.09), 0 2px 16px rgba(0,0,0,0.05)",
+              boxShadow: c.heroCardShadow,
               width: "100%", maxWidth: 420,
-              border: "1px solid #f1f5f9",
+              border: `1px solid ${c.borderLight}`,
               position: "relative",
+              transition: "all 0.3s",
             }}>
               {/* Corner accents */}
-              <div style={{ position: "absolute", top: 16, left: 16, width: 16, height: 16, borderTop: "2px solid #cbd5e1", borderLeft: "2px solid #cbd5e1", borderRadius: "2px 0 0 0" }} />
-              <div style={{ position: "absolute", top: 16, right: 16, width: 16, height: 16, borderTop: "2px solid #cbd5e1", borderRight: "2px solid #cbd5e1", borderRadius: "0 2px 0 0" }} />
-              <div style={{ position: "absolute", bottom: 16, left: 16, width: 16, height: 16, borderBottom: "2px solid #cbd5e1", borderLeft: "2px solid #cbd5e1", borderRadius: "0 0 0 2px" }} />
-              <div style={{ position: "absolute", bottom: 16, right: 16, width: 16, height: 16, borderBottom: "2px solid #cbd5e1", borderRight: "2px solid #cbd5e1", borderRadius: "0 0 2px 0" }} />
+              <div style={{ position: "absolute", top: 16, left: 16, width: 16, height: 16, borderTop: `2px solid ${c.border}`, borderLeft: `2px solid ${c.border}`, borderRadius: "2px 0 0 0" }} />
+              <div style={{ position: "absolute", top: 16, right: 16, width: 16, height: 16, borderTop: `2px solid ${c.border}`, borderRight: `2px solid ${c.border}`, borderRadius: "0 2px 0 0" }} />
+              <div style={{ position: "absolute", bottom: 16, left: 16, width: 16, height: 16, borderBottom: `2px solid ${c.border}`, borderLeft: `2px solid ${c.border}`, borderRadius: "0 0 0 2px" }} />
+              <div style={{ position: "absolute", bottom: 16, right: 16, width: 16, height: 16, borderBottom: `2px solid ${c.border}`, borderRight: `2px solid ${c.border}`, borderRadius: "0 0 2px 0" }} />
 
               {/* Header */}
               <div style={{ textAlign: "center", marginBottom: 24 }}>
                 <div style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: 2.5, color: "#94a3b8",
+                  fontSize: 10, fontWeight: 700, letterSpacing: 2.5, color: c.textMuted,
                   textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 14,
                 }}>TOPICS WE EXPLORE</div>
                 <h3 style={{
-                  fontSize: 22, fontWeight: 700, color: "#0f172a",
+                  fontSize: 22, fontWeight: 700, color: c.text,
                   fontFamily: "'Space Grotesk', sans-serif", margin: 0, letterSpacing: "-0.01em",
                 }}>Your Weekly Rundown</h3>
               </div>
@@ -587,7 +620,7 @@ export default function TechBlogHome() {
                   <div key={p.label} style={{
                     display: "flex", alignItems: "center", gap: 14,
                     padding: "14px 16px", borderRadius: 12,
-                    border: "1px solid #f1f5f9", background: "#fafafa",
+                    border: `1px solid ${c.borderLight}`, background: c.surfaceHover,
                     transition: "all 0.2s",
                   }}>
                     <div style={{
@@ -598,11 +631,11 @@ export default function TechBlogHome() {
                     }}>{p.icon}</div>
                     <div>
                       <div style={{
-                        fontSize: 14, fontWeight: 700, color: "#0f172a",
+                        fontSize: 14, fontWeight: 700, color: c.text,
                         fontFamily: "'Space Grotesk', sans-serif",
                       }}>{p.label}</div>
                       <div style={{
-                        fontSize: 12.5, color: "#94a3b8",
+                        fontSize: 12.5, color: c.textMuted,
                         fontFamily: "'DM Sans', sans-serif", marginTop: 1,
                       }}>{p.desc}</div>
                     </div>
@@ -612,10 +645,10 @@ export default function TechBlogHome() {
 
               {/* Footer */}
               <div style={{
-                borderTop: "1px solid #f1f5f9", paddingTop: 14, marginTop: 20,
+                borderTop: `1px solid ${c.borderLight}`, paddingTop: 14, marginTop: 20,
                 textAlign: "center",
               }}>
-                <span style={{ fontSize: 12, color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>
+                <span style={{ fontSize: 12, color: c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>
                   Fresh content every week · Made for builders
                 </span>
               </div>
@@ -626,21 +659,21 @@ export default function TechBlogHome() {
       </section>
 
       {/* NEWS SECTION */}
-      <div style={{ position: "relative", zIndex: 1, background: "#fff" }}>
+      <div style={{ position: "relative", zIndex: 1, background: c.surface, transition: "background 0.3s" }}>
       <section id="news" style={{ padding: "60px 40px 80px", maxWidth: 1200, margin: "0 auto" }}>
         <AnimateIn className="fade-up">
         <div style={{ marginBottom: 40 }}>
           <div style={{
-            fontSize: 12, fontWeight: 600, color: "#0f172a", letterSpacing: 2,
+            fontSize: 12, fontWeight: 600, color: c.text, letterSpacing: 2,
             textTransform: "uppercase", fontFamily: "'JetBrains Mono', monospace", marginBottom: 12,
           }}>Latest Stories</div>
           <h2 style={{
             fontSize: 32, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: "-0.01em", margin: "0 0 24px", color: "#0f172a",
+            letterSpacing: "-0.01em", margin: "0 0 24px", color: c.text,
           }}>What the dev world is talking about</h2>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {CATEGORIES.map((c) => (
-              <CategoryPill key={c} label={c} active={activeCategory === c} onClick={() => setActiveCategory(c)} />
+            {CATEGORIES.map((cat) => (
+              <CategoryPill key={cat} label={cat} active={activeCategory === cat} onClick={() => setActiveCategory(cat)} />
             ))}
           </div>
         </div>
@@ -652,7 +685,7 @@ export default function TechBlogHome() {
           {filtered.map((a, i) => <AnimateIn key={a.id} className="fade-up" delay={0.1 * i}><ArticleCard article={a} index={i} /></AnimateIn>)}
         </div>
         {filtered.length === 0 && (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8", fontFamily: "'JetBrains Mono', monospace" }}>
+          <div style={{ textAlign: "center", padding: "60px 20px", color: c.textMuted, fontFamily: "'JetBrains Mono', monospace" }}>
             Nothing here yet — new stories are on the way.
           </div>
         )}
@@ -660,7 +693,7 @@ export default function TechBlogHome() {
       </div>
 
       {/* DEV SETUP SECTION */}
-      <div style={{ position: "relative", zIndex: 1, background: "#fff" }}>
+      <div style={{ position: "relative", zIndex: 1, background: c.surface, transition: "background 0.3s" }}>
       <section id="dev-setup" style={{
         padding: "80px 40px", maxWidth: 1200, margin: "0 auto",
       }}>
@@ -672,9 +705,9 @@ export default function TechBlogHome() {
           }}>Toolbox</div>
           <h2 style={{
             fontSize: 32, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: "-0.01em", margin: "0 0 12px", color: "#0f172a",
+            letterSpacing: "-0.01em", margin: "0 0 12px", color: c.text,
           }}>Essential tools to level up your workflow</h2>
-          <p style={{ fontSize: 15, color: "#64748b", maxWidth: 500, margin: "0 auto", lineHeight: 1.6 }}>
+          <p style={{ fontSize: 15, color: c.textSecondary, maxWidth: 500, margin: "0 auto", lineHeight: 1.6 }}>
             Hand-selected editors, terminals, and utilities chosen for the way developers actually work. Set up once and start shipping.
           </p>
         </div>
@@ -688,7 +721,7 @@ export default function TechBlogHome() {
       </div>
 
       {/* LAB SECTION */}
-      <div style={{ position: "relative", zIndex: 1, background: "#fff" }}>
+      <div style={{ position: "relative", zIndex: 1, background: c.surface, transition: "background 0.3s" }}>
       <section id="lab" style={{
         padding: "80px 40px", maxWidth: 900, margin: "0 auto",
       }}>
@@ -700,9 +733,9 @@ export default function TechBlogHome() {
           }}>The Lab</div>
           <h2 style={{
             fontSize: 32, fontWeight: 700, fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: "-0.01em", margin: "0 0 12px", color: "#0f172a",
+            letterSpacing: "-0.01em", margin: "0 0 12px", color: c.text,
           }}>How Fast Can You Type?</h2>
-          <p style={{ fontSize: 15, color: "#64748b", maxWidth: 460, margin: "0 auto", lineHeight: 1.6 }}>
+          <p style={{ fontSize: 15, color: c.textSecondary, maxWidth: 460, margin: "0 auto", lineHeight: 1.6 }}>
             Put your fingers to the test with our dev-oriented typing challenge. Toggle between everyday words and real code syntax.
           </p>
         </div>

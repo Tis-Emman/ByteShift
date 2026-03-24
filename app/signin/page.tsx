@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Moon, Sun } from "lucide-react";
+import { useTheme, darkColors } from "../theme-context";
 
 export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  const c = darkColors(dark);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,37 +22,39 @@ export default function SignIn() {
       minHeight: "100vh",
       display: "flex",
       fontFamily: "'DM Sans', sans-serif",
+      transition: "background 0.3s",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        input:focus { border-color: #0f172a !important; box-shadow: 0 0 0 3px rgba(0,0,0,0.08) !important; }
-        .auth-input { transition: border-color 0.2s, box-shadow 0.2s; }
+        input:focus { border-color: ${dark ? "#94a3b8" : "#0f172a"} !important; box-shadow: 0 0 0 3px ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"} !important; }
+        .auth-input { transition: border-color 0.2s, box-shadow 0.2s, background 0.3s, color 0.3s; }
         .auth-btn { transition: background 0.2s, transform 0.1s; }
         .auth-btn:active { transform: scale(0.98); }
       `}</style>
 
       {/* Left - Visual */}
       <div style={{
-        flex: 1, background: "#fefefe",
+        flex: 1, background: c.bgAlt,
         display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center",
         padding: 60, position: "relative", overflow: "hidden",
+        transition: "background 0.3s",
       }}>
         {/* Grid bg */}
         <div style={{
           position: "absolute", inset: 0,
-          backgroundImage: "linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px)",
+          backgroundImage: `linear-gradient(${c.gridLine} 1px, transparent 1px), linear-gradient(90deg, ${c.gridLine} 1px, transparent 1px)`,
           backgroundSize: "60px 60px",
         }} />
         <div style={{ position: "relative", textAlign: "center", maxWidth: 400 }}>
           <h2 style={{
-            fontSize: 32, fontWeight: 700, color: "#0f172a",
+            fontSize: 32, fontWeight: 700, color: c.text,
             fontFamily: "'Space Grotesk', sans-serif",
             letterSpacing: "-0.02em", margin: "0 0 16px",
           }}>Stay in the Loop</h2>
           <p style={{
-            fontSize: 16, color: "#64748b",
+            fontSize: 16, color: c.textSecondary,
             lineHeight: 1.7,
           }}>
             The latest in AI, hardware breakdowns, developer tools, and gaming culture — all in one place for builders and creators.
@@ -60,13 +66,31 @@ export default function SignIn() {
       <div style={{
         flex: 1, display: "flex", flexDirection: "column",
         justifyContent: "center", alignItems: "center",
-        padding: "40px 24px", background: "#fff",
+        padding: "40px 24px", background: c.surface,
+        position: "relative", transition: "background 0.3s",
       }}>
+        {/* Theme toggle */}
+        <button
+          onClick={toggle}
+          aria-label="Toggle theme"
+          style={{
+            position: "absolute", top: 24, right: 24,
+            width: 40, height: 40, borderRadius: 10,
+            background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
+            border: `1px solid ${c.border}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", color: c.text,
+            transition: "all 0.3s",
+          }}
+        >
+          {dark ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
         <div style={{ width: "100%", maxWidth: 400 }}>
           {/* Back link */}
           <Link href="/" style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 14, color: "#64748b", textDecoration: "none",
+            fontSize: 14, color: c.textSecondary, textDecoration: "none",
             marginBottom: 40, fontWeight: 500,
           }}>
             <ArrowLeft size={16} /> Back to home
@@ -74,11 +98,11 @@ export default function SignIn() {
 
           {/* Heading */}
           <h1 style={{
-            fontSize: 28, fontWeight: 700, color: "#0f172a",
+            fontSize: 28, fontWeight: 700, color: c.text,
             fontFamily: "'Space Grotesk', sans-serif",
             letterSpacing: "-0.02em", margin: "0 0 8px",
           }}>Good to see you again</h1>
-          <p style={{ fontSize: 15, color: "#64748b", margin: "0 0 32px" }}>
+          <p style={{ fontSize: 15, color: c.textSecondary, margin: "0 0 32px" }}>
             Log in to pick up where you left off
           </p>
 
@@ -88,7 +112,7 @@ export default function SignIn() {
             <div style={{ marginBottom: 20 }}>
               <label style={{
                 display: "block", fontSize: 13, fontWeight: 600,
-                color: "#0f172a", marginBottom: 6,
+                color: c.text, marginBottom: 6,
               }}>Email address</label>
               <input
                 className="auth-input"
@@ -98,8 +122,8 @@ export default function SignIn() {
                 placeholder="you@example.com"
                 style={{
                   width: "100%", padding: "12px 16px", borderRadius: 10,
-                  border: "1.5px solid #e2e8f0", fontSize: 15, outline: "none",
-                  color: "#0f172a", background: "#f8fafc",
+                  border: `1.5px solid ${c.border}`, fontSize: 15, outline: "none",
+                  color: c.text, background: c.inputBg,
                 }}
               />
             </div>
@@ -108,7 +132,7 @@ export default function SignIn() {
             <div style={{ marginBottom: 12 }}>
               <label style={{
                 display: "block", fontSize: 13, fontWeight: 600,
-                color: "#0f172a", marginBottom: 6,
+                color: c.text, marginBottom: 6,
               }}>Password</label>
               <div style={{ position: "relative" }}>
                 <input
@@ -119,8 +143,8 @@ export default function SignIn() {
                   placeholder="Enter your password"
                   style={{
                     width: "100%", padding: "12px 48px 12px 16px", borderRadius: 10,
-                    border: "1.5px solid #e2e8f0", fontSize: 15, outline: "none",
-                    color: "#0f172a", background: "#f8fafc",
+                    border: `1.5px solid ${c.border}`, fontSize: 15, outline: "none",
+                    color: c.text, background: c.inputBg,
                   }}
                 />
                 <button
@@ -128,7 +152,7 @@ export default function SignIn() {
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
                     position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer", color: "#94a3b8",
+                    background: "none", border: "none", cursor: "pointer", color: c.textMuted,
                     display: "flex", alignItems: "center",
                   }}
                 >
@@ -140,16 +164,16 @@ export default function SignIn() {
             {/* Forgot password */}
             <div style={{ textAlign: "right", marginBottom: 28 }}>
               <a href="#" style={{
-                fontSize: 13, color: "#64748b", textDecoration: "none", fontWeight: 500,
+                fontSize: 13, color: c.textSecondary, textDecoration: "none", fontWeight: 500,
               }}>Forgot password?</a>
             </div>
 
             {/* Submit */}
             <button className="auth-btn" type="submit" style={{
               width: "100%", padding: "14px", borderRadius: 10,
-              background: "#0f172a", color: "#fff",
+              background: c.btnBg, color: c.btnText,
               fontSize: 15, fontWeight: 700, border: "none", cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "'DM Sans', sans-serif", transition: "all 0.3s",
             }}>Sign In</button>
           </form>
 
@@ -158,18 +182,19 @@ export default function SignIn() {
             display: "flex", alignItems: "center", gap: 16,
             margin: "28px 0",
           }}>
-            <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
-            <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>OR</span>
-            <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+            <div style={{ flex: 1, height: 1, background: c.border }} />
+            <span style={{ fontSize: 12, color: c.textMuted, fontWeight: 500 }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: c.border }} />
           </div>
 
           {/* Google */}
           <button className="auth-btn" style={{
             width: "100%", padding: "13px", borderRadius: 10,
-            background: "#fff", border: "1.5px solid #e2e8f0",
+            background: c.surface, border: `1.5px solid ${c.border}`,
             fontSize: 14, fontWeight: 600, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-            color: "#0f172a", fontFamily: "'DM Sans', sans-serif",
+            color: c.text, fontFamily: "'DM Sans', sans-serif",
+            transition: "all 0.3s",
           }}>
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -183,11 +208,11 @@ export default function SignIn() {
           {/* Sign up link */}
           <p style={{
             textAlign: "center", marginTop: 28,
-            fontSize: 14, color: "#64748b",
+            fontSize: 14, color: c.textSecondary,
           }}>
             Don&apos;t have an account?{" "}
             <Link href="/signup" style={{
-              color: "#0f172a", fontWeight: 700, textDecoration: "none",
+              color: c.text, fontWeight: 700, textDecoration: "none",
             }}>Sign up</Link>
           </p>
         </div>
