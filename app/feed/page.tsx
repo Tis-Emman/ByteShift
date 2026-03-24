@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2 } from "lucide-react";
 import { useTheme, darkColors } from "../theme-context";
@@ -85,6 +85,9 @@ export default function TechFeed() {
   const [ghSince, setGhSince] = useState<"daily" | "weekly" | "monthly">("daily");
   const [savedItems, setSavedItems] = useState<BookmarkItem[]>([]);
   const [bookmarkTick, setBookmarkTick] = useState(0);
+  const [redditAfter, setRedditAfter] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   const c = darkColors(dark);
@@ -137,6 +140,25 @@ export default function TechFeed() {
     setBookmarkTick((t) => t + 1);
   };
 
+  const parseRedditItems = (data: { data: { children: { data: RedditPost }[]; after: string | null } }) => {
+    return data.data.children.map((child: { data: RedditPost }) => ({
+      id: child.data.id,
+      title: child.data.title,
+      url: child.data.url,
+      permalink: child.data.permalink,
+      subreddit: child.data.subreddit,
+      author: child.data.author,
+      score: child.data.score,
+      num_comments: child.data.num_comments,
+      created_utc: child.data.created_utc,
+      selftext: child.data.selftext,
+      thumbnail: child.data.thumbnail,
+      is_self: child.data.is_self,
+      link_flair_text: child.data.link_flair_text,
+      domain: child.data.domain,
+    }));
+  };
+
   const fetchPosts = async (sub: string, sortBy: string) => {
     setLoading(true);
     setError("");
@@ -144,28 +166,32 @@ export default function TechFeed() {
       const res = await fetch(`/api/reddit?sub=${sub}&sort=${sortBy}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      const items: RedditPost[] = data.data.children.map((child: { data: RedditPost }) => ({
-        id: child.data.id,
-        title: child.data.title,
-        url: child.data.url,
-        permalink: child.data.permalink,
-        subreddit: child.data.subreddit,
-        author: child.data.author,
-        score: child.data.score,
-        num_comments: child.data.num_comments,
-        created_utc: child.data.created_utc,
-        selftext: child.data.selftext,
-        thumbnail: child.data.thumbnail,
-        is_self: child.data.is_self,
-        link_flair_text: child.data.link_flair_text,
-        domain: child.data.domain,
-      }));
-      setPosts(items);
+      setPosts(parseRedditItems(data));
+      setRedditAfter(data.data?.after || null);
     } catch {
       setError("Couldn't load posts. Reddit may be rate-limiting — try again in a moment.");
     }
     setLoading(false);
   };
+
+  const fetchMorePosts = useCallback(async () => {
+    if (loadingMore || !redditAfter || source !== "reddit") return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/api/reddit?sub=${activeSub}&sort=${sort}&after=${redditAfter}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      const newItems = parseRedditItems(data);
+      setPosts((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        return [...prev, ...newItems.filter((p: RedditPost) => !existingIds.has(p.id))];
+      });
+      setRedditAfter(data.data?.after || null);
+    } catch {
+      // silently fail on load-more
+    }
+    setLoadingMore(false);
+  }, [loadingMore, redditAfter, source, activeSub, sort]);
 
   const fetchGithub = async (lang: string, since: string) => {
     setLoading(true);
@@ -188,6 +214,18 @@ export default function TechFeed() {
   useEffect(() => {
     if (source === "github") fetchGithub(ghLang, ghSince);
   }, [ghLang, ghSince, source]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) fetchMorePosts(); },
+      { rootMargin: "400px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fetchMorePosts]);
 
   const handleRefresh = () => {
     if (source === "reddit") fetchPosts(activeSub, sort);
@@ -216,6 +254,8 @@ export default function TechFeed() {
         .sub-pill { transition: all 0.2s; cursor: pointer; }
         .sort-btn { transition: all 0.2s; cursor: pointer; }
         .source-btn { transition: all 0.2s; cursor: pointer; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .spin { animation: spin 1s linear infinite; }
         @media (max-width: 768px) {
           .feed-header { padding: 0 16px !important; }
           .feed-container { padding: 20px 16px 60px !important; }
@@ -584,6 +624,30 @@ export default function TechFeed() {
                 </div>
               </Link>
             ))}
+
+            {/* Infinite scroll sentinel + loading indicator */}
+            {redditAfter && (
+              <div ref={sentinelRef} style={{ padding: "24px 0", textAlign: "center" }}>
+                {loadingMore && (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    color: c.textMuted, fontSize: 13,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    <RefreshCw size={14} className="spin" /> Loading more...
+                  </div>
+                )}
+              </div>
+            )}
+            {!redditAfter && posts.length > 0 && (
+              <div style={{
+                padding: "24px 0", textAlign: "center",
+                color: c.textMuted, fontSize: 12,
+                fontFamily: "'JetBrains Mono', monospace",
+              }}>
+                You&apos;ve reached the end
+              </div>
+            )}
           </div>
         )}
 
