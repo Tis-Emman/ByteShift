@@ -8,7 +8,8 @@
       "Bash(node -e \"const l = require\\(''lucide-react''\\); console.log\\(''Container:'', !!l.Container, ''Box:'', !!l.Box\\)\")",
       "Bash(node -e \"const l = require\\(''lucide-react''\\); console.log\\(''Container:'', ''Container'' in l, ''Box:'', ''Box'' in l\\)\")",
       "Bash(find 'e:/Self Project/byteshift/my-app/node_modules/next/dist/docs/' -type f -name *.md)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(find 'e:/Self Project/byteshift/my-app/node_modules/next/dist/docs/01-app' -name *.md -path *route*)"
     ]
   }
 }

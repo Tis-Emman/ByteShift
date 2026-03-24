@@ -442,6 +442,7 @@ export default function TechBlogHome() {
 
         @media (max-width: 768px) {
           .nav-desktop { display: none !important; }
+          .mobile-menu-wrapper { display: flex !important; }
           .mobile-menu-btn { display: flex !important; align-items: center; }
           .mobile-nav { display: flex !important; flex-direction: column; position: fixed; top: 72px; left: 0; right: 0; bottom: 0; background: ${c.navBg}; padding: 24px; gap: 0; z-index: 99; border-top: 1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}; }
           .mobile-nav .nav-link { font-size: 18px !important; padding: 16px 0 !important; border-bottom: 1px solid ${c.border}; }
@@ -533,7 +534,7 @@ export default function TechBlogHome() {
         </div>
 
         {/* Mobile menu buttons */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="mobile-menu-wrapper" style={{ display: "none", alignItems: "center", gap: 8 }}>
           <button onClick={toggle} className="mobile-menu-btn" aria-label="Toggle theme">
             {dark ? <Sun size={20} /> : <Moon size={20} />}
           </button>
@@ -679,7 +680,7 @@ export default function TechBlogHome() {
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {[
                   { icon: <Bot size={18} />, label: "AI & Innovation", desc: "New models, research drops, and industry shifts", color: "#3b82f6" },
-                  { icon: <Terminal size={18} />, label: "Tools & Hardware", desc: "Honest reviews of editors, devices, and setups", color: "#0f172a" },
+                  { icon: <Terminal size={18} />, label: "Tools & Hardware", desc: "Honest reviews of editors, devices, and setups", color: dark ? "#e2e8f0" : "#0f172a" },
                   { icon: <Sparkles size={18} />, label: "Gaming & Dev Life", desc: "The intersection of play, code, and community", color: "#f59e0b" },
                   { icon: <Zap size={18} />, label: "Workflow Hacks", desc: "Practical tips to build faster and stay focused", color: "#10b981" },
                 ].map((p) => (
