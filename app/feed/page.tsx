@@ -87,6 +87,7 @@ export default function TechFeed() {
   const [bookmarkTick, setBookmarkTick] = useState(0);
   const [redditAfter, setRedditAfter] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showTop, setShowTop] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
@@ -214,6 +215,13 @@ export default function TechFeed() {
   useEffect(() => {
     if (source === "github") fetchGithub(ghLang, ghSince);
   }, [ghLang, ghSince, source]);
+
+  // Back to top visibility
+  useEffect(() => {
+    const onScroll = () => setShowTop(window.scrollY > 400);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -963,6 +971,26 @@ export default function TechFeed() {
           </div>
         )}
       </div>
+
+      {/* Back to top button */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        aria-label="Back to top"
+        style={{
+          position: "fixed", bottom: 32, right: 32, zIndex: 200,
+          width: 48, height: 48, borderRadius: 14,
+          background: c.btnBg, color: c.btnText,
+          border: "none", cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+          opacity: showTop ? 1 : 0,
+          pointerEvents: showTop ? "auto" : "none",
+          transform: showTop ? "translateY(0)" : "translateY(16px)",
+          transition: "opacity 0.3s, transform 0.3s",
+        }}
+      >
+        <ArrowUp size={20} />
+      </button>
     </div>
   );
 }
