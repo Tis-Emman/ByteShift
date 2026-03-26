@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2, Search, X, Flame } from "lucide-react";
 import { useTheme, darkColors } from "../theme-context";
 import { type BookmarkItem, getBookmarks, isBookmarked, toggleBookmark, removeBookmark } from "../bookmarks";
 
@@ -33,6 +33,19 @@ type GitHubRepo = {
   forks: number;
   starsToday: string;
   url: string;
+};
+
+type HNStory = {
+  id: number;
+  title: string;
+  url: string;
+  author: string;
+  score: number;
+  comments: number;
+  time: number;
+  domain: string;
+  hnUrl: string;
+  isSelf: boolean;
 };
 
 const SUBREDDITS = [
@@ -74,7 +87,7 @@ function formatScore(n: number): string {
 }
 
 export default function TechFeed() {
-  const [source, setSource] = useState<"reddit" | "github" | "saved">("reddit");
+  const [source, setSource] = useState<"reddit" | "github" | "hackernews" | "saved">("reddit");
   const [posts, setPosts] = useState<RedditPost[]>([]);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,6 +96,11 @@ export default function TechFeed() {
   const [sort, setSort] = useState<"hot" | "new" | "top">("hot");
   const [ghLang, setGhLang] = useState("");
   const [ghSince, setGhSince] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [hnStories, setHnStories] = useState<HNStory[]>([]);
+  const [hnSort, setHnSort] = useState<"top" | "new" | "best" | "ask" | "show">("top");
+  const [hnPage, setHnPage] = useState(0);
+  const [hnHasMore, setHnHasMore] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [savedItems, setSavedItems] = useState<BookmarkItem[]>([]);
   const [bookmarkTick, setBookmarkTick] = useState(0);
   const [redditAfter, setRedditAfter] = useState<string | null>(null);
@@ -208,6 +226,46 @@ export default function TechFeed() {
     setLoading(false);
   };
 
+  const fetchHN = async (sortBy: string, page = 0, append = false) => {
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/hackernews?sort=${sortBy}&page=${page}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const data = await res.json();
+      if (append) {
+        setHnStories((prev) => {
+          const ids = new Set(prev.map((s) => s.id));
+          return [...prev, ...data.items.filter((s: HNStory) => !ids.has(s.id))];
+        });
+      } else {
+        setHnStories(data.items || []);
+      }
+      setHnHasMore(data.hasMore);
+      setHnPage(page);
+    } catch {
+      setError("Couldn't load stories. Try again in a moment.");
+    }
+    if (!append) setLoading(false);
+    else setLoadingMore(false);
+  };
+
+  const handleBookmarkHN = (e: React.MouseEvent, story: HNStory) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleBookmark({
+      id: `hn_${story.id}`,
+      type: "reddit", // reuse reddit type for display (has score, comments)
+      title: story.title,
+      url: story.url,
+      savedAt: Date.now(),
+      score: story.score,
+      num_comments: story.comments,
+    });
+    setBookmarkTick((t) => t + 1);
+  };
+
   useEffect(() => {
     if (source === "reddit") fetchPosts(activeSub, sort);
   }, [activeSub, sort, source]);
@@ -215,6 +273,10 @@ export default function TechFeed() {
   useEffect(() => {
     if (source === "github") fetchGithub(ghLang, ghSince);
   }, [ghLang, ghSince, source]);
+
+  useEffect(() => {
+    if (source === "hackernews") { setHnPage(0); fetchHN(hnSort, 0); }
+  }, [hnSort, source]);
 
   // Back to top visibility
   useEffect(() => {
@@ -224,23 +286,44 @@ export default function TechFeed() {
   }, []);
 
   // Infinite scroll observer
+  const fetchMore = useCallback(() => {
+    if (source === "reddit") fetchMorePosts();
+    else if (source === "hackernews" && hnHasMore && !loadingMore) fetchHN(hnSort, hnPage + 1, true);
+  }, [source, fetchMorePosts, hnHasMore, loadingMore, hnSort, hnPage]);
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) fetchMorePosts(); },
+      ([entry]) => { if (entry.isIntersecting) fetchMore(); },
       { rootMargin: "400px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [fetchMorePosts]);
+  }, [fetchMore]);
 
   const handleRefresh = () => {
     if (source === "reddit") fetchPosts(activeSub, sort);
-    else fetchGithub(ghLang, ghSince);
+    else if (source === "github") fetchGithub(ghLang, ghSince);
+    else if (source === "hackernews") fetchHN(hnSort, 0);
   };
 
   const handleRetry = () => handleRefresh();
+
+  // Search filtering
+  const q = searchQuery.toLowerCase().trim();
+  const filteredPosts = q ? posts.filter((p) =>
+    p.title.toLowerCase().includes(q) || p.subreddit.toLowerCase().includes(q) || p.author.toLowerCase().includes(q) || (p.selftext && p.selftext.toLowerCase().includes(q))
+  ) : posts;
+  const filteredRepos = q ? repos.filter((r) =>
+    r.name.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q)) || (r.language && r.language.toLowerCase().includes(q))
+  ) : repos;
+  const filteredHN = q ? hnStories.filter((s) =>
+    s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q) || s.domain.toLowerCase().includes(q)
+  ) : hnStories;
+  const filteredSaved = q ? savedItems.filter((i) =>
+    i.title.toLowerCase().includes(q) || (i.description && i.description.toLowerCase().includes(q)) || (i.name && i.name.toLowerCase().includes(q))
+  ) : savedItems;
 
   return (
     <div style={{
@@ -273,6 +356,7 @@ export default function TechFeed() {
           .feed-title { font-size: 14px !important; }
           .source-toggle { gap: 4px !important; }
           .source-btn { font-size: 12px !important; padding: 6px 12px !important; }
+          .search-bar { width: 140px !important; }
         }
       `}</style>
 
@@ -300,6 +384,8 @@ export default function TechFeed() {
               ? <Rss size={20} color={dark ? "#f59e0b" : "#0f172a"} />
               : source === "github"
               ? <Github size={20} color={dark ? "#f59e0b" : "#0f172a"} />
+              : source === "hackernews"
+              ? <Flame size={20} color={dark ? "#f59e0b" : "#0f172a"} />
               : <BookmarkCheck size={20} color={dark ? "#f59e0b" : "#0f172a"} />
             }
             <span style={{
@@ -310,6 +396,40 @@ export default function TechFeed() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Search bar */}
+          <div className="search-bar" style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 14px", borderRadius: 10,
+            background: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+            border: `1px solid ${searchQuery ? (dark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)") : c.border}`,
+            transition: "all 0.2s",
+            width: searchQuery ? 260 : 180,
+          }}>
+            <Search size={14} color={c.textMuted} style={{ flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search feeds..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                background: "transparent", border: "none", outline: "none",
+                color: c.text, fontSize: 13, fontWeight: 500,
+                fontFamily: "'DM Sans', sans-serif",
+                width: "100%",
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: 0, display: "flex", color: c.textMuted, flexShrink: 0,
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <button
             onClick={handleRefresh}
             style={{
@@ -378,6 +498,21 @@ export default function TechFeed() {
             }}
           >
             <Github size={15} /> GitHub Trending
+          </button>
+          <button
+            className="source-btn"
+            onClick={() => setSource("hackernews")}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "8px 20px", borderRadius: 9,
+              border: "none",
+              background: source === "hackernews" ? c.btnBg : "transparent",
+              color: source === "hackernews" ? c.btnText : c.textMuted,
+              fontSize: 13, fontWeight: 700,
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            <Flame size={15} /> Hacker News
           </button>
           <button
             className="source-btn"
@@ -493,6 +628,30 @@ export default function TechFeed() {
           </>
         )}
 
+        {/* Hacker News filters */}
+        {source === "hackernews" && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 32, flexWrap: "wrap" }}>
+            {(["top", "new", "best", "ask", "show"] as const).map((s) => (
+              <button
+                key={s}
+                className="sort-btn"
+                onClick={() => setHnSort(s)}
+                style={{
+                  padding: "8px 18px", borderRadius: 20,
+                  border: hnSort === s ? `1px solid ${c.pillActiveBorder}` : `1px solid ${c.border}`,
+                  background: hnSort === s ? c.pillActiveBg : c.surface,
+                  color: hnSort === s ? c.pillActiveText : c.textMuted,
+                  fontSize: 13, fontWeight: 600,
+                  fontFamily: "'DM Sans', sans-serif",
+                  textTransform: "capitalize",
+                }}
+              >
+                {s === "ask" ? "Ask HN" : s === "show" ? "Show HN" : s}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Loading state */}
         {loading && source !== "saved" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -533,7 +692,7 @@ export default function TechFeed() {
         {/* Reddit Posts */}
         {!loading && !error && source === "reddit" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {posts.map((post) => (
+            {filteredPosts.map((post) => (
               <Link
                 key={post.id}
                 href={`/feed/post?permalink=${encodeURIComponent(post.permalink)}`}
@@ -647,7 +806,7 @@ export default function TechFeed() {
                 )}
               </div>
             )}
-            {!redditAfter && posts.length > 0 && (
+            {!redditAfter && filteredPosts.length > 0 && (
               <div style={{
                 padding: "24px 0", textAlign: "center",
                 color: c.textMuted, fontSize: 12,
@@ -662,7 +821,7 @@ export default function TechFeed() {
         {/* GitHub Repos */}
         {!loading && !error && source === "github" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {repos.map((repo) => (
+            {filteredRepos.map((repo) => (
               <a
                 key={repo.name}
                 href={repo.url}
@@ -781,20 +940,130 @@ export default function TechFeed() {
           </div>
         )}
 
+        {/* Hacker News Stories */}
+        {!loading && !error && source === "hackernews" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {filteredHN.map((story) => (
+              <a
+                key={story.id}
+                href={story.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="feed-card"
+                style={{
+                  display: "block", textDecoration: "none",
+                  background: c.surface,
+                  border: `1px solid ${c.borderLight}`,
+                  borderRadius: 14,
+                  padding: "20px 24px",
+                  boxShadow: c.cardShadow,
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                  <div className="feed-vote" style={{
+                    display: "flex", flexDirection: "column", alignItems: "center",
+                    minWidth: 48, paddingTop: 2,
+                  }}>
+                    <ArrowUp size={16} color={dark ? "#f59e0b" : "#ff6600"} />
+                    <span style={{
+                      fontSize: 14, fontWeight: 700, color: c.text,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}>{formatScore(story.score)}</span>
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 600, color: dark ? "#ff6600" : "#ff6600",
+                        fontFamily: "'JetBrains Mono', monospace",
+                        textTransform: "uppercase", letterSpacing: 0.5,
+                      }}>HN</span>
+                      <span style={{
+                        fontSize: 11, color: c.textMuted,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}>by {story.author}</span>
+                      <button
+                        onClick={(e) => handleBookmarkHN(e, story)}
+                        style={{
+                          marginLeft: "auto", background: "none", border: "none",
+                          cursor: "pointer", padding: 4, display: "flex",
+                          color: isBookmarked(`hn_${story.id}`) ? (dark ? "#f59e0b" : "#3b82f6") : c.textMuted,
+                          transition: "color 0.2s",
+                        }}
+                        aria-label={isBookmarked(`hn_${story.id}`) ? "Remove bookmark" : "Bookmark"}
+                      >
+                        {isBookmarked(`hn_${story.id}`) ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+                      </button>
+                    </div>
+
+                    <h3 className="feed-title" style={{
+                      fontSize: 16, fontWeight: 700, color: c.text,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      lineHeight: 1.4, margin: "0 0 10px",
+                    }}>{story.title}</h3>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <span style={{
+                        display: "flex", alignItems: "center", gap: 4,
+                        fontSize: 12, color: c.textMuted,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}>
+                        <MessageSquare size={13} /> {story.comments}
+                      </span>
+                      <span style={{
+                        display: "flex", alignItems: "center", gap: 4,
+                        fontSize: 12, color: c.textMuted,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}>
+                        <Clock size={13} /> {timeAgo(story.time)}
+                      </span>
+                      {!story.isSelf && (
+                        <span style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 11, color: c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          marginLeft: "auto",
+                        }}>
+                          <ExternalLink size={12} /> {story.domain}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </a>
+            ))}
+
+            {/* Infinite scroll sentinel for HN */}
+            {hnHasMore && (
+              <div ref={sentinelRef} style={{ padding: "24px 0", textAlign: "center" }}>
+                {loadingMore && (
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    color: c.textMuted, fontSize: 13,
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}>
+                    <RefreshCw size={14} className="spin" /> Loading more...
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Saved items */}
         {source === "saved" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {savedItems.length === 0 && (
+            {filteredSaved.length === 0 && (
               <div style={{
                 textAlign: "center", padding: "60px 20px",
                 color: c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
               }}>
                 <BookmarkCheck size={32} style={{ marginBottom: 12, opacity: 0.4 }} />
                 <br />
-                No saved items yet. Bookmark posts or repos to see them here.
+                {q ? `No saved items matching "${searchQuery}"` : "No saved items yet. Bookmark posts or repos to see them here."}
               </div>
             )}
-            {savedItems.map((item) => (
+            {filteredSaved.map((item) => (
               <div
                 key={item.id}
                 className="feed-card"
@@ -960,13 +1229,21 @@ export default function TechFeed() {
         )}
 
         {/* Empty */}
-        {!loading && !error && source !== "saved" && ((source === "reddit" && posts.length === 0) || (source === "github" && repos.length === 0)) && (
+        {!loading && !error && source !== "saved" && (
+          (source === "reddit" && filteredPosts.length === 0) ||
+          (source === "github" && filteredRepos.length === 0) ||
+          (source === "hackernews" && filteredHN.length === 0)
+        ) && (
           <div style={{
             textAlign: "center", padding: "60px 20px",
             color: c.textMuted, fontFamily: "'JetBrains Mono', monospace", fontSize: 14,
           }}>
-            {source === "reddit"
+            {q
+              ? `No results for "${searchQuery}"`
+              : source === "reddit"
               ? "No posts found. Try a different subreddit or sort."
+              : source === "hackernews"
+              ? "No stories found. Try a different category."
               : "No trending repos found. Try a different language or time range."}
           </div>
         )}
