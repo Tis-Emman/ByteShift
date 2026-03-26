@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2, Search, X, Flame } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2, Search, X, Flame, BookOpen, Eye } from "lucide-react";
 import { useTheme, darkColors } from "../theme-context";
 import { type BookmarkItem, getBookmarks, isBookmarked, toggleBookmark, removeBookmark } from "../bookmarks";
+import { markAsRead, getReadIds } from "../reading-history";
 
 type RedditPost = {
   id: string;
@@ -101,6 +102,8 @@ export default function TechFeed() {
   const [hnPage, setHnPage] = useState(0);
   const [hnHasMore, setHnHasMore] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [hideRead, setHideRead] = useState(false);
   const [savedItems, setSavedItems] = useState<BookmarkItem[]>([]);
   const [bookmarkTick, setBookmarkTick] = useState(0);
   const [redditAfter, setRedditAfter] = useState<string | null>(null);
@@ -110,6 +113,11 @@ export default function TechFeed() {
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   const c = darkColors(dark);
+
+  // Load reading history
+  useEffect(() => {
+    setReadIds(getReadIds());
+  }, []);
 
   // Reload saved items when switching to saved tab or after bookmark changes
   useEffect(() => {
@@ -310,20 +318,24 @@ export default function TechFeed() {
 
   const handleRetry = () => handleRefresh();
 
-  // Search filtering
+  const handlePostClick = (id: string) => {
+    markAsRead(id);
+    setReadIds((prev) => new Set(prev).add(id));
+  };
+
+  // Search + read filtering
   const q = searchQuery.toLowerCase().trim();
-  const filteredPosts = q ? posts.filter((p) =>
-    p.title.toLowerCase().includes(q) || p.subreddit.toLowerCase().includes(q) || p.author.toLowerCase().includes(q) || (p.selftext && p.selftext.toLowerCase().includes(q))
-  ) : posts;
-  const filteredRepos = q ? repos.filter((r) =>
-    r.name.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q)) || (r.language && r.language.toLowerCase().includes(q))
-  ) : repos;
-  const filteredHN = q ? hnStories.filter((s) =>
-    s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q) || s.domain.toLowerCase().includes(q)
-  ) : hnStories;
-  const filteredSaved = q ? savedItems.filter((i) =>
-    i.title.toLowerCase().includes(q) || (i.description && i.description.toLowerCase().includes(q)) || (i.name && i.name.toLowerCase().includes(q))
-  ) : savedItems;
+  const filteredPosts = posts
+    .filter((p) => !q || p.title.toLowerCase().includes(q) || p.subreddit.toLowerCase().includes(q) || p.author.toLowerCase().includes(q) || (p.selftext && p.selftext.toLowerCase().includes(q)))
+    .filter((p) => !hideRead || !readIds.has(`reddit_${p.id}`));
+  const filteredRepos = repos
+    .filter((r) => !q || r.name.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q)) || (r.language && r.language.toLowerCase().includes(q)))
+    .filter((r) => !hideRead || !readIds.has(`github_${r.name}`));
+  const filteredHN = hnStories
+    .filter((s) => !q || s.title.toLowerCase().includes(q) || s.author.toLowerCase().includes(q) || s.domain.toLowerCase().includes(q))
+    .filter((s) => !hideRead || !readIds.has(`hn_${s.id}`));
+  const filteredSaved = savedItems
+    .filter((i) => !q || i.title.toLowerCase().includes(q) || (i.description && i.description.toLowerCase().includes(q)) || (i.name && i.name.toLowerCase().includes(q)));
 
   return (
     <div style={{
@@ -396,6 +408,24 @@ export default function TechFeed() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {/* Hide read toggle */}
+          <button
+            onClick={() => setHideRead(!hideRead)}
+            title={hideRead ? "Show all posts" : "Hide read posts"}
+            style={{
+              width: 36, height: 36, borderRadius: 8,
+              background: hideRead
+                ? (dark ? "rgba(245,158,11,0.15)" : "rgba(59,130,246,0.1)")
+                : (dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
+              border: `1px solid ${hideRead ? (dark ? "#f59e0b" : "#3b82f6") : c.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+              color: hideRead ? (dark ? "#f59e0b" : "#3b82f6") : c.textMuted,
+              transition: "all 0.2s",
+            }}
+          >
+            <Eye size={16} />
+          </button>
           {/* Search bar */}
           <div className="search-bar" style={{
             display: "flex", alignItems: "center", gap: 8,
@@ -692,10 +722,13 @@ export default function TechFeed() {
         {/* Reddit Posts */}
         {!loading && !error && source === "reddit" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {filteredPosts.map((post) => (
+            {filteredPosts.map((post) => {
+              const isVisited = readIds.has(`reddit_${post.id}`);
+              return (
               <Link
                 key={post.id}
                 href={`/feed/post?permalink=${encodeURIComponent(post.permalink)}`}
+                onClick={() => handlePostClick(`reddit_${post.id}`)}
                 className="feed-card"
                 style={{
                   display: "block", textDecoration: "none",
@@ -704,6 +737,8 @@ export default function TechFeed() {
                   borderRadius: 14,
                   padding: "20px 24px",
                   boxShadow: c.cardShadow,
+                  opacity: isVisited ? 0.55 : 1,
+                  transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -778,19 +813,34 @@ export default function TechFeed() {
                         <Clock size={13} /> {timeAgo(post.created_utc)}
                       </span>
                       {!post.is_self && (
-                        <span style={{
-                          display: "flex", alignItems: "center", gap: 4,
-                          fontSize: 11, color: c.textMuted,
-                          fontFamily: "'JetBrains Mono', monospace",
-                        }}>
-                          <ExternalLink size={12} /> {post.domain}
-                        </span>
+                        <>
+                          <span style={{
+                            display: "flex", alignItems: "center", gap: 4,
+                            fontSize: 11, color: c.textMuted,
+                            fontFamily: "'JetBrains Mono', monospace",
+                          }}>
+                            <ExternalLink size={12} /> {post.domain}
+                          </span>
+                          <Link
+                            href={`/reader?url=${encodeURIComponent(post.url)}`}
+                            onClick={(e) => { e.stopPropagation(); handlePostClick(`reddit_${post.id}`); }}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 4,
+                              fontSize: 11, color: dark ? "#f59e0b" : "#3b82f6",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              textDecoration: "none", fontWeight: 600,
+                            }}
+                          >
+                            <BookOpen size={12} /> Reader
+                          </Link>
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
 
             {/* Infinite scroll sentinel + loading indicator */}
             {redditAfter && (
@@ -827,6 +877,7 @@ export default function TechFeed() {
                 href={repo.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => handlePostClick(`github_${repo.name}`)}
                 className="feed-card"
                 style={{
                   display: "block", textDecoration: "none",
@@ -835,6 +886,8 @@ export default function TechFeed() {
                   borderRadius: 14,
                   padding: "20px 24px",
                   boxShadow: c.cardShadow,
+                  opacity: readIds.has(`github_${repo.name}`) ? 0.55 : 1,
+                  transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -949,6 +1002,7 @@ export default function TechFeed() {
                 href={story.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => handlePostClick(`hn_${story.id}`)}
                 className="feed-card"
                 style={{
                   display: "block", textDecoration: "none",
@@ -957,6 +1011,8 @@ export default function TechFeed() {
                   borderRadius: 14,
                   padding: "20px 24px",
                   boxShadow: c.cardShadow,
+                  opacity: readIds.has(`hn_${story.id}`) ? 0.55 : 1,
+                  transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -1018,14 +1074,28 @@ export default function TechFeed() {
                         <Clock size={13} /> {timeAgo(story.time)}
                       </span>
                       {!story.isSelf && (
-                        <span style={{
-                          display: "flex", alignItems: "center", gap: 4,
-                          fontSize: 11, color: c.textMuted,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          marginLeft: "auto",
-                        }}>
-                          <ExternalLink size={12} /> {story.domain}
-                        </span>
+                        <>
+                          <span style={{
+                            display: "flex", alignItems: "center", gap: 4,
+                            fontSize: 11, color: c.textMuted,
+                            fontFamily: "'JetBrains Mono', monospace",
+                            marginLeft: "auto",
+                          }}>
+                            <ExternalLink size={12} /> {story.domain}
+                          </span>
+                          <Link
+                            href={`/reader?url=${encodeURIComponent(story.url)}`}
+                            onClick={(e) => { e.stopPropagation(); handlePostClick(`hn_${story.id}`); }}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 4,
+                              fontSize: 11, color: dark ? "#f59e0b" : "#3b82f6",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              textDecoration: "none", fontWeight: 600,
+                            }}
+                          >
+                            <BookOpen size={12} /> Reader
+                          </Link>
+                        </>
                       )}
                     </div>
                   </div>
