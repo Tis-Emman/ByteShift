@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2, Search, X, Flame, BookOpen, Eye } from "lucide-react";
+import { ArrowLeft, ExternalLink, MessageSquare, ArrowUp, Clock, RefreshCw, Moon, Sun, Rss, Star, GitFork, TrendingUp, Github, Bookmark, BookmarkCheck, Trash2, Search, X, Flame, BookOpen, Eye, Settings, Plus, Download, Bell, Share2, Hash, Keyboard, Copy, Check } from "lucide-react";
 import { useTheme, darkColors } from "../theme-context";
 import { type BookmarkItem, getBookmarks, isBookmarked, toggleBookmark, removeBookmark } from "../bookmarks";
 import { markAsRead, getReadIds } from "../reading-history";
+import Onboarding from "../onboarding";
 
 type RedditPost = {
   id: string;
@@ -49,7 +50,68 @@ type HNStory = {
   isSelf: boolean;
 };
 
-const SUBREDDITS = [
+// Custom feed storage
+const CUSTOM_SUBS_KEY = "byteshift_custom_subs";
+const CUSTOM_LANGS_KEY = "byteshift_custom_langs";
+const LAST_VISIT_KEY = "byteshift_last_visit";
+
+function getCustomSubs(): { name: string; label: string }[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(CUSTOM_SUBS_KEY) || "[]"); } catch { return []; }
+}
+function saveCustomSubs(subs: { name: string; label: string }[]) {
+  localStorage.setItem(CUSTOM_SUBS_KEY, JSON.stringify(subs));
+}
+function getCustomLangs(): { name: string; label: string }[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(CUSTOM_LANGS_KEY) || "[]"); } catch { return []; }
+}
+function saveCustomLangs(langs: { name: string; label: string }[]) {
+  localStorage.setItem(CUSTOM_LANGS_KEY, JSON.stringify(langs));
+}
+function getLastVisit(): number {
+  if (typeof window === "undefined") return Date.now();
+  return parseInt(localStorage.getItem(LAST_VISIT_KEY) || "0", 10);
+}
+function updateLastVisit() {
+  localStorage.setItem(LAST_VISIT_KEY, String(Math.floor(Date.now() / 1000)));
+}
+
+function exportAsJSON(items: BookmarkItem[]) {
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "byteshift-bookmarks.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportAsMarkdown(items: BookmarkItem[]) {
+  let md = "# ByteShift Saved Items\n\n";
+  md += `Exported on ${new Date().toLocaleDateString()}\n\n`;
+  const reddit = items.filter((i) => i.type === "reddit");
+  const github = items.filter((i) => i.type === "github");
+  if (reddit.length > 0) {
+    md += "## Reddit Posts\n\n";
+    reddit.forEach((i) => {
+      md += `- **[${i.title}](${i.permalink ? `https://reddit.com${i.permalink}` : i.url})** — r/${i.subreddit || "unknown"} · ${i.score || 0} pts · ${i.num_comments || 0} comments\n`;
+    });
+    md += "\n";
+  }
+  if (github.length > 0) {
+    md += "## GitHub Repos\n\n";
+    github.forEach((i) => {
+      md += `- **[${i.name || i.title}](${i.url})** — ${i.language || "N/A"} · ⭐ ${i.stars || 0} · ${i.description || ""}\n`;
+    });
+    md += "\n";
+  }
+  const blob = new Blob([md], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "byteshift-bookmarks.md"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+const DEFAULT_SUBREDDITS = [
   { name: "technology", label: "Technology" },
   { name: "programming", label: "Programming" },
   { name: "webdev", label: "Web Dev" },
@@ -60,7 +122,7 @@ const SUBREDDITS = [
   { name: "ITPhilippines", label: "IT Philippines" },
 ];
 
-const LANGUAGES = [
+const DEFAULT_LANGUAGES = [
   { name: "", label: "All" },
   { name: "typescript", label: "TypeScript" },
   { name: "python", label: "Python" },
@@ -109,6 +171,16 @@ export default function TechFeed() {
   const [redditAfter, setRedditAfter] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showTop, setShowTop] = useState(false);
+  const [customSubs, setCustomSubs] = useState<{ name: string; label: string }[]>([]);
+  const [customLangs, setCustomLangs] = useState<{ name: string; label: string }[]>([]);
+  const [showSettings, setShowSettings] = useState(false);
+  const [newSubName, setNewSubName] = useState("");
+  const [newLangName, setNewLangName] = useState("");
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [newPostCount, setNewPostCount] = useState(0);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
@@ -118,6 +190,23 @@ export default function TechFeed() {
   useEffect(() => {
     setReadIds(getReadIds());
   }, []);
+
+  // Load custom feeds
+  useEffect(() => {
+    setCustomSubs(getCustomSubs());
+    setCustomLangs(getCustomLangs());
+  }, []);
+
+  // Notification badge — count posts newer than last visit
+  useEffect(() => {
+    const lastVisit = getLastVisit();
+    if (lastVisit > 0 && posts.length > 0) {
+      const count = posts.filter((p) => p.created_utc > lastVisit).length;
+      setNewPostCount(count);
+    }
+    // Update last visit timestamp when leaving
+    return () => { updateLastVisit(); };
+  }, [posts]);
 
   // Reload saved items when switching to saved tab or after bookmark changes
   useEffect(() => {
@@ -318,10 +407,141 @@ export default function TechFeed() {
 
   const handleRetry = () => handleRefresh();
 
+  // Merge default + custom feeds
+  const allSubs = [...DEFAULT_SUBREDDITS, ...customSubs];
+  const allLangs = [...DEFAULT_LANGUAGES, ...customLangs];
+
+  const addCustomSub = () => {
+    const name = newSubName.trim();
+    if (!name) return;
+    if (allSubs.some((s) => s.name.toLowerCase() === name.toLowerCase())) return;
+    const updated = [...customSubs, { name, label: name }];
+    setCustomSubs(updated);
+    saveCustomSubs(updated);
+    setNewSubName("");
+  };
+
+  const removeCustomSub = (name: string) => {
+    const updated = customSubs.filter((s) => s.name !== name);
+    setCustomSubs(updated);
+    saveCustomSubs(updated);
+    if (activeSub === name) setActiveSub("technology");
+  };
+
+  const addCustomLang = () => {
+    const name = newLangName.trim().toLowerCase();
+    if (!name) return;
+    if (allLangs.some((l) => l.name.toLowerCase() === name)) return;
+    const label = name.charAt(0).toUpperCase() + name.slice(1);
+    const updated = [...customLangs, { name, label }];
+    setCustomLangs(updated);
+    saveCustomLangs(updated);
+    setNewLangName("");
+  };
+
+  const removeCustomLang = (name: string) => {
+    const updated = customLangs.filter((l) => l.name !== name);
+    setCustomLangs(updated);
+    saveCustomLangs(updated);
+    if (ghLang === name) setGhLang("");
+  };
+
   const handlePostClick = (id: string) => {
     markAsRead(id);
     setReadIds((prev) => new Set(prev).add(id));
   };
+
+  const handleShare = async (title: string, url: string, id: string) => {
+    const text = `${title}\n${url}\n\nShared via ByteShift`;
+    if (navigator.share) {
+      try { await navigator.share({ title, url, text }); } catch { /* cancelled */ }
+    } else {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const sources: Array<"reddit" | "github" | "hackernews" | "saved"> = ["reddit", "github", "hackernews", "saved"];
+      switch (e.key) {
+        case "1": case "2": case "3": case "4":
+          e.preventDefault();
+          setSource(sources[parseInt(e.key) - 1]);
+          break;
+        case "r":
+          e.preventDefault();
+          handleRefresh();
+          break;
+        case "/":
+          e.preventDefault();
+          (document.querySelector(".search-input") as HTMLInputElement)?.focus();
+          break;
+        case "?":
+          e.preventDefault();
+          setShowShortcuts((p) => !p);
+          break;
+        case "Escape":
+          setShowShortcuts(false);
+          setShowSettings(false);
+          setShowExportMenu(false);
+          break;
+        case "j":
+          e.preventDefault();
+          setFocusedIndex((p) => p + 1);
+          break;
+        case "k":
+          e.preventDefault();
+          setFocusedIndex((p) => Math.max(p - 1, 0));
+          break;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Scroll focused card into view
+  useEffect(() => {
+    if (focusedIndex < 0) return;
+    const cards = document.querySelectorAll(".feed-card");
+    if (cards[focusedIndex]) {
+      cards[focusedIndex].scrollIntoView({ behavior: "smooth", block: "center" });
+      (cards[focusedIndex] as HTMLElement).style.outline = `2px solid ${dark ? "#f59e0b" : "#3b82f6"}`;
+      (cards[focusedIndex] as HTMLElement).style.outlineOffset = "2px";
+    }
+    // Clear outline from previous
+    cards.forEach((card, i) => {
+      if (i !== focusedIndex) {
+        (card as HTMLElement).style.outline = "none";
+      }
+    });
+  }, [focusedIndex, dark]);
+
+  // Extract trending topics from current posts
+  const trendingTopics = (() => {
+    const words: Record<string, number> = {};
+    const stopWords = new Set(["the", "a", "an", "is", "it", "in", "to", "for", "of", "and", "on", "with", "my", "i", "this", "that", "was", "are", "be", "has", "have", "how", "what", "why", "from", "or", "not", "but", "all", "just", "your", "you", "can", "do", "will", "about", "its"]);
+    const allTitles = [
+      ...posts.map((p) => p.title),
+      ...hnStories.map((s) => s.title),
+    ];
+    allTitles.forEach((title) => {
+      title.toLowerCase().split(/\W+/).forEach((w) => {
+        if (w.length > 3 && !stopWords.has(w) && !/^\d+$/.test(w)) {
+          words[w] = (words[w] || 0) + 1;
+        }
+      });
+    });
+    return Object.entries(words)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([word, count]) => ({ word, count }));
+  })();
 
   // Search + read filtering
   const q = searchQuery.toLowerCase().trim();
@@ -340,7 +560,9 @@ export default function TechFeed() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: c.bg,
+      background: dark
+        ? `radial-gradient(ellipse 80% 50% at 50% -20%, rgba(245,158,11,0.05) 0%, transparent 60%), ${c.bg}`
+        : `radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,130,246,0.04) 0%, transparent 60%), ${c.bg}`,
       color: c.text,
       fontFamily: "'DM Sans', sans-serif",
       transition: "background 0.3s, color 0.3s",
@@ -348,34 +570,135 @@ export default function TechFeed() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
         ::selection { background: ${c.selectionBg}; color: ${c.selectionColor}; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: ${c.scrollTrackBg}; }
-        ::-webkit-scrollbar-thumb { background: ${c.scrollThumbBg}; border-radius: 3px; }
-        .feed-card { transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
-        .feed-card:hover { transform: translateY(-2px); box-shadow: ${c.cardShadowHover}; }
-        .sub-pill { transition: all 0.2s; cursor: pointer; }
-        .sort-btn { transition: all 0.2s; cursor: pointer; }
-        .source-btn { transition: all 0.2s; cursor: pointer; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.1)"}; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: ${dark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.2)"}; }
+
+        .feed-card {
+          transition: all 0.3s cubic-bezier(0.22,1,0.36,1);
+          position: relative;
+        }
+        .feed-card::before {
+          content: '';
+          position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
+          background: transparent; border-radius: 2px;
+          transition: background 0.3s;
+        }
+        .feed-card:hover {
+          transform: translateY(-3px) scale(1.003);
+          box-shadow: ${dark
+            ? "0 12px 40px rgba(0,0,0,0.5), 0 2px 8px rgba(245,158,11,0.08)"
+            : "0 12px 40px rgba(0,0,0,0.08), 0 2px 8px rgba(59,130,246,0.06)"};
+        }
+        .feed-card:hover::before {
+          background: ${dark ? "#f59e0b" : "#3b82f6"};
+        }
+
+        .sub-pill {
+          transition: all 0.25s cubic-bezier(0.22,1,0.36,1);
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+        }
+        .sub-pill::after {
+          content: '';
+          position: absolute; inset: 0;
+          background: ${dark ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.06)"};
+          opacity: 0; transition: opacity 0.25s;
+        }
+        .sub-pill:hover::after { opacity: 1; }
+        .sub-pill:hover { transform: translateY(-1px); }
+        .sub-pill:active { transform: scale(0.97); }
+
+        .sort-btn {
+          transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+          cursor: pointer;
+        }
+        .sort-btn:hover { transform: translateY(-1px); }
+        .sort-btn:active { transform: scale(0.96); }
+
+        .source-btn {
+          transition: all 0.3s cubic-bezier(0.22,1,0.36,1);
+          cursor: pointer;
+          position: relative;
+        }
+        .source-btn:hover { transform: translateY(-1px); }
+        .source-btn:active { transform: scale(0.97); }
+
+        .header-btn {
+          transition: all 0.2s cubic-bezier(0.22,1,0.36,1);
+        }
+        .header-btn:hover {
+          transform: translateY(-1px);
+          background: ${dark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)"} !important;
+        }
+        .header-btn:active { transform: scale(0.93); }
+
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .spin { animation: spin 1s linear infinite; }
+
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .feed-card { animation: fadeInUp 0.4s cubic-bezier(0.22,1,0.36,1) backwards; }
+        .feed-card:nth-child(1) { animation-delay: 0s; }
+        .feed-card:nth-child(2) { animation-delay: 0.04s; }
+        .feed-card:nth-child(3) { animation-delay: 0.08s; }
+        .feed-card:nth-child(4) { animation-delay: 0.12s; }
+        .feed-card:nth-child(5) { animation-delay: 0.16s; }
+        .feed-card:nth-child(6) { animation-delay: 0.2s; }
+        .feed-card:nth-child(n+7) { animation-delay: 0.24s; }
+
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .skeleton-shimmer {
+          background: linear-gradient(90deg,
+            ${dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"} 25%,
+            ${dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"} 50%,
+            ${dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)"} 75%
+          );
+          background-size: 200% 100%;
+          animation: shimmer 1.5s ease-in-out infinite;
+        }
+
+        .search-bar {
+          transition: all 0.3s cubic-bezier(0.22,1,0.36,1) !important;
+        }
+        .search-bar:focus-within {
+          width: 280px !important;
+          border-color: ${dark ? "rgba(245,158,11,0.4)" : "rgba(59,130,246,0.4)"} !important;
+          box-shadow: 0 0 0 3px ${dark ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.06)"};
+        }
+
         @media (max-width: 768px) {
           .feed-header { padding: 0 16px !important; }
           .feed-container { padding: 20px 16px 60px !important; }
           .feed-card { padding: 16px !important; }
+          .feed-card::before { display: none; }
           .feed-vote { display: none !important; }
           .feed-meta { font-size: 10px !important; }
           .feed-title { font-size: 14px !important; }
-          .source-toggle { gap: 4px !important; }
-          .source-btn { font-size: 12px !important; padding: 6px 12px !important; }
-          .search-bar { width: 140px !important; }
+          .source-toggle { gap: 4px !important; overflow-x: auto; width: 100% !important; }
+          .source-btn { font-size: 12px !important; padding: 6px 12px !important; white-space: nowrap; }
+          .search-bar { width: 120px !important; }
+          .search-bar:focus-within { width: 180px !important; }
+          .header-actions { gap: 6px !important; }
+          .header-btn-text { display: none !important; }
         }
       `}</style>
 
       {/* Header */}
       <header className="feed-header" style={{
         position: "sticky", top: 0, zIndex: 100,
-        background: c.navBg,
+        background: dark ? "rgba(10,10,15,0.85)" : "rgba(255,255,255,0.85)",
+        backdropFilter: "blur(16px) saturate(180%)",
+        WebkitBackdropFilter: "blur(16px) saturate(180%)",
         borderBottom: `1px solid ${dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)"}`,
         padding: "0 40px", height: 64,
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -412,8 +735,9 @@ export default function TechFeed() {
           <button
             onClick={() => setHideRead(!hideRead)}
             title={hideRead ? "Show all posts" : "Hide read posts"}
+            className="header-btn"
             style={{
-              width: 36, height: 36, borderRadius: 8,
+              width: 36, height: 36, borderRadius: 10,
               background: hideRead
                 ? (dark ? "rgba(245,158,11,0.15)" : "rgba(59,130,246,0.1)")
                 : (dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"),
@@ -421,7 +745,6 @@ export default function TechFeed() {
               display: "flex", alignItems: "center", justifyContent: "center",
               cursor: "pointer",
               color: hideRead ? (dark ? "#f59e0b" : "#3b82f6") : c.textMuted,
-              transition: "all 0.2s",
             }}
           >
             <Eye size={16} />
@@ -438,7 +761,8 @@ export default function TechFeed() {
             <Search size={14} color={c.textMuted} style={{ flexShrink: 0 }} />
             <input
               type="text"
-              placeholder="Search feeds..."
+              className="search-input"
+              placeholder="Search feeds... ( / )"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -486,6 +810,35 @@ export default function TechFeed() {
           >
             {dark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            aria-label="Feed settings"
+            style={{
+              width: 36, height: 36, borderRadius: 8,
+              background: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+              border: `1px solid ${c.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: c.textSecondary,
+            }}
+          >
+            <Settings size={16} />
+          </button>
+          <button
+            onClick={() => setShowShortcuts(true)}
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            style={{
+              width: 36, height: 36, borderRadius: 8,
+              background: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+              border: `1px solid ${c.border}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: c.textMuted,
+              fontSize: 15, fontWeight: 700,
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            ?
+          </button>
         </div>
       </header>
 
@@ -493,38 +846,48 @@ export default function TechFeed() {
 
         {/* Source toggle */}
         <div className="source-toggle" style={{
-          display: "flex", gap: 6, marginBottom: 24,
-          padding: 4, borderRadius: 12,
+          display: "flex", gap: 4, marginBottom: 28,
+          padding: 5, borderRadius: 14,
           background: dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
           border: `1px solid ${c.borderLight}`,
           width: "fit-content",
+          boxShadow: dark ? "inset 0 1px 3px rgba(0,0,0,0.3)" : "inset 0 1px 3px rgba(0,0,0,0.04)",
         }}>
           <button
             className="source-btn"
             onClick={() => setSource("reddit")}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 20px", borderRadius: 9,
+              padding: "8px 20px", borderRadius: 10,
               border: "none",
               background: source === "reddit" ? c.btnBg : "transparent",
               color: source === "reddit" ? c.btnText : c.textMuted,
               fontSize: 13, fontWeight: 700,
               fontFamily: "'Space Grotesk', sans-serif",
+              boxShadow: source === "reddit" ? (dark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)") : "none",
             }}
           >
             <Rss size={15} /> Reddit
+            {newPostCount > 0 && source !== "reddit" && (
+              <span style={{
+                fontSize: 10, fontWeight: 800, lineHeight: 1,
+                padding: "2px 6px", borderRadius: 10,
+                background: "#ef4444", color: "#fff",
+              }}>{newPostCount > 99 ? "99+" : newPostCount}</span>
+            )}
           </button>
           <button
             className="source-btn"
             onClick={() => setSource("github")}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 20px", borderRadius: 9,
+              padding: "8px 20px", borderRadius: 10,
               border: "none",
               background: source === "github" ? c.btnBg : "transparent",
               color: source === "github" ? c.btnText : c.textMuted,
               fontSize: 13, fontWeight: 700,
               fontFamily: "'Space Grotesk', sans-serif",
+              boxShadow: source === "github" ? (dark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)") : "none",
             }}
           >
             <Github size={15} /> GitHub Trending
@@ -534,12 +897,13 @@ export default function TechFeed() {
             onClick={() => setSource("hackernews")}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 20px", borderRadius: 9,
+              padding: "8px 20px", borderRadius: 10,
               border: "none",
               background: source === "hackernews" ? c.btnBg : "transparent",
               color: source === "hackernews" ? c.btnText : c.textMuted,
               fontSize: 13, fontWeight: 700,
               fontFamily: "'Space Grotesk', sans-serif",
+              boxShadow: source === "hackernews" ? (dark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)") : "none",
             }}
           >
             <Flame size={15} /> Hacker News
@@ -549,13 +913,14 @@ export default function TechFeed() {
             onClick={() => setSource("saved")}
             style={{
               display: "flex", alignItems: "center", gap: 8,
-              padding: "8px 20px", borderRadius: 9,
+              padding: "8px 20px", borderRadius: 10,
               border: "none",
               background: source === "saved" ? c.btnBg : "transparent",
               color: source === "saved" ? c.btnText : c.textMuted,
               fontSize: 13, fontWeight: 700,
               fontFamily: "'Space Grotesk', sans-serif",
               position: "relative",
+              boxShadow: source === "saved" ? (dark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.1)") : "none",
             }}
           >
             <BookmarkCheck size={15} /> Saved
@@ -570,27 +935,95 @@ export default function TechFeed() {
           </button>
         </div>
 
+        {/* Trending Topics */}
+        {trendingTopics.length > 0 && (source === "reddit" || source === "hackernews") && (
+          <div style={{
+            display: "flex", gap: 8, marginBottom: 20,
+            overflowX: "auto", paddingBottom: 4,
+            WebkitOverflowScrolling: "touch",
+          }}>
+            <span style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontSize: 11, fontWeight: 700, color: c.textMuted,
+              fontFamily: "'JetBrains Mono', monospace",
+              textTransform: "uppercase", letterSpacing: 1,
+              flexShrink: 0, paddingRight: 4,
+            }}>
+              <Hash size={12} /> Trending
+            </span>
+            {trendingTopics.map((t) => (
+              <button
+                key={t.word}
+                onClick={() => setSearchQuery(t.word)}
+                style={{
+                  padding: "4px 12px", borderRadius: 14,
+                  border: `1px solid ${searchQuery === t.word ? (dark ? "#f59e0b" : "#3b82f6") : c.border}`,
+                  background: searchQuery === t.word
+                    ? (dark ? "rgba(245,158,11,0.15)" : "rgba(59,130,246,0.1)")
+                    : (dark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)"),
+                  color: searchQuery === t.word ? (dark ? "#f59e0b" : "#3b82f6") : c.textMuted,
+                  fontSize: 12, fontWeight: 500, cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                  whiteSpace: "nowrap", flexShrink: 0,
+                  transition: "all 0.2s",
+                }}
+              >
+                {t.word}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Reddit filters */}
         {source === "reddit" && (
           <>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-              {SUBREDDITS.map((sub) => (
-                <button
-                  key={sub.name}
-                  className="sub-pill"
-                  onClick={() => setActiveSub(sub.name)}
-                  style={{
-                    padding: "8px 18px", borderRadius: 20,
-                    border: activeSub === sub.name ? `1px solid ${c.pillActiveBorder}` : `1px solid ${c.border}`,
-                    background: activeSub === sub.name ? c.pillActiveBg : c.surface,
-                    color: activeSub === sub.name ? c.pillActiveText : c.textMuted,
-                    fontSize: 13, fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif",
-                  }}
-                >
-                  r/{sub.label}
-                </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
+              {allSubs.map((sub) => (
+                <div key={sub.name} style={{ position: "relative", display: "inline-flex" }}>
+                  <button
+                    className="sub-pill"
+                    onClick={() => setActiveSub(sub.name)}
+                    style={{
+                      padding: "8px 18px", borderRadius: 20,
+                      border: activeSub === sub.name ? `1px solid ${c.pillActiveBorder}` : `1px solid ${c.border}`,
+                      background: activeSub === sub.name ? c.pillActiveBg : c.surface,
+                      color: activeSub === sub.name ? c.pillActiveText : c.textMuted,
+                      fontSize: 13, fontWeight: 600,
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    r/{sub.label}
+                  </button>
+                  {customSubs.some((cs) => cs.name === sub.name) && (
+                    <button
+                      onClick={() => removeCustomSub(sub.name)}
+                      style={{
+                        position: "absolute", top: -6, right: -6,
+                        width: 18, height: 18, borderRadius: "50%",
+                        background: dark ? "#ef4444" : "#dc2626",
+                        color: "#fff", border: "none", cursor: "pointer",
+                        fontSize: 10, fontWeight: 800,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        lineHeight: 1,
+                      }}
+                    >×</button>
+                  )}
+                </div>
               ))}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="sub-pill"
+                style={{
+                  padding: "8px 14px", borderRadius: 20,
+                  border: `1px dashed ${c.border}`,
+                  background: "transparent",
+                  color: c.textMuted, fontSize: 13, fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: 4,
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                <Plus size={14} /> Add
+              </button>
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 32 }}>
               {(["hot", "new", "top"] as const).map((s) => (
@@ -617,24 +1050,53 @@ export default function TechFeed() {
         {/* GitHub filters */}
         {source === "github" && (
           <>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20 }}>
-              {LANGUAGES.map((lang) => (
-                <button
-                  key={lang.name}
-                  className="sub-pill"
-                  onClick={() => setGhLang(lang.name)}
-                  style={{
-                    padding: "8px 18px", borderRadius: 20,
-                    border: ghLang === lang.name ? `1px solid ${c.pillActiveBorder}` : `1px solid ${c.border}`,
-                    background: ghLang === lang.name ? c.pillActiveBg : c.surface,
-                    color: ghLang === lang.name ? c.pillActiveText : c.textMuted,
-                    fontSize: 13, fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif",
-                  }}
-                >
-                  {lang.label}
-                </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 20, alignItems: "center" }}>
+              {allLangs.map((lang) => (
+                <div key={lang.name || "__all"} style={{ position: "relative", display: "inline-flex" }}>
+                  <button
+                    className="sub-pill"
+                    onClick={() => setGhLang(lang.name)}
+                    style={{
+                      padding: "8px 18px", borderRadius: 20,
+                      border: ghLang === lang.name ? `1px solid ${c.pillActiveBorder}` : `1px solid ${c.border}`,
+                      background: ghLang === lang.name ? c.pillActiveBg : c.surface,
+                      color: ghLang === lang.name ? c.pillActiveText : c.textMuted,
+                      fontSize: 13, fontWeight: 600,
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    {lang.label}
+                  </button>
+                  {customLangs.some((cl) => cl.name === lang.name) && (
+                    <button
+                      onClick={() => removeCustomLang(lang.name)}
+                      style={{
+                        position: "absolute", top: -6, right: -6,
+                        width: 18, height: 18, borderRadius: "50%",
+                        background: dark ? "#ef4444" : "#dc2626",
+                        color: "#fff", border: "none", cursor: "pointer",
+                        fontSize: 10, fontWeight: 800,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        lineHeight: 1,
+                      }}
+                    >×</button>
+                  )}
+                </div>
               ))}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="sub-pill"
+                style={{
+                  padding: "8px 14px", borderRadius: 20,
+                  border: `1px dashed ${c.border}`,
+                  background: "transparent",
+                  color: c.textMuted, fontSize: 13, fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: 4,
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                <Plus size={14} /> Add
+              </button>
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 32 }}>
               {(["daily", "weekly", "monthly"] as const).map((s) => (
@@ -684,18 +1146,27 @@ export default function TechFeed() {
 
         {/* Loading state */}
         {loading && source !== "saved" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {[...Array(6)].map((_, i) => (
               <div key={i} style={{
                 background: c.surface, border: `1px solid ${c.borderLight}`,
-                borderRadius: 14, padding: "24px 28px",
-                animation: "pulse 1.5s ease-in-out infinite",
+                borderRadius: 16, padding: "24px 28px",
+                opacity: 1 - i * 0.08,
+                animation: `fadeInUp 0.4s cubic-bezier(0.22,1,0.36,1) ${i * 0.06}s backwards`,
               }}>
-                <div style={{ height: 16, width: "70%", background: c.surfaceHover, borderRadius: 8, marginBottom: 12 }} />
-                <div style={{ height: 12, width: "40%", background: c.surfaceHover, borderRadius: 6 }} />
+                <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                  <div className="skeleton-shimmer" style={{ height: 12, width: 80, borderRadius: 6 }} />
+                  <div className="skeleton-shimmer" style={{ height: 12, width: 50, borderRadius: 6 }} />
+                </div>
+                <div className="skeleton-shimmer" style={{ height: 18, width: `${70 - i * 5}%`, borderRadius: 8, marginBottom: 10 }} />
+                <div className="skeleton-shimmer" style={{ height: 14, width: `${50 - i * 3}%`, borderRadius: 6, marginBottom: 16 }} />
+                <div style={{ display: "flex", gap: 16 }}>
+                  <div className="skeleton-shimmer" style={{ height: 12, width: 40, borderRadius: 6 }} />
+                  <div className="skeleton-shimmer" style={{ height: 12, width: 50, borderRadius: 6 }} />
+                  <div className="skeleton-shimmer" style={{ height: 12, width: 70, borderRadius: 6 }} />
+                </div>
               </div>
             ))}
-            <style>{`@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }`}</style>
           </div>
         )}
 
@@ -734,11 +1205,10 @@ export default function TechFeed() {
                   display: "block", textDecoration: "none",
                   background: c.surface,
                   border: `1px solid ${c.borderLight}`,
-                  borderRadius: 14,
-                  padding: "20px 24px",
-                  boxShadow: c.cardShadow,
-                  opacity: isVisited ? 0.55 : 1,
-                  transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
+                  borderRadius: 16,
+                  padding: "22px 26px",
+                  boxShadow: dark ? "0 2px 12px rgba(0,0,0,0.2)" : "0 2px 12px rgba(0,0,0,0.04)",
+                  opacity: isVisited ? 0.5 : 1,
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -793,11 +1263,23 @@ export default function TechFeed() {
                     {post.selftext && (
                       <p style={{
                         fontSize: 13, color: c.textSecondary, lineHeight: 1.6,
-                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                        display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
                         overflow: "hidden", margin: "0 0 10px",
                       }}>{post.selftext}</p>
                     )}
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                      {post.num_comments > 50 && (
+                        <span style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 11, fontWeight: 700,
+                          color: dark ? "#f59e0b" : "#ea580c",
+                          fontFamily: "'JetBrains Mono', monospace",
+                          padding: "2px 8px", borderRadius: 4,
+                          background: dark ? "rgba(245,158,11,0.12)" : "rgba(234,88,12,0.08)",
+                        }}>
+                          🔥 Hot
+                        </span>
+                      )}
                       <span style={{
                         display: "flex", alignItems: "center", gap: 4,
                         fontSize: 12, color: c.textMuted,
@@ -835,6 +1317,19 @@ export default function TechFeed() {
                           </Link>
                         </>
                       )}
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(post.title, `https://reddit.com${post.permalink}`, `reddit_${post.id}`); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 11, color: copiedId === `reddit_${post.id}` ? "#10b981" : c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          background: "none", border: "none", cursor: "pointer",
+                          marginLeft: "auto", padding: 0,
+                          transition: "color 0.2s",
+                        }}
+                      >
+                        {copiedId === `reddit_${post.id}` ? <><Check size={12} /> Copied</> : <><Share2 size={12} /> Share</>}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -883,11 +1378,10 @@ export default function TechFeed() {
                   display: "block", textDecoration: "none",
                   background: c.surface,
                   border: `1px solid ${c.borderLight}`,
-                  borderRadius: 14,
-                  padding: "20px 24px",
-                  boxShadow: c.cardShadow,
-                  opacity: readIds.has(`github_${repo.name}`) ? 0.55 : 1,
-                  transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
+                  borderRadius: 16,
+                  padding: "22px 26px",
+                  boxShadow: dark ? "0 2px 12px rgba(0,0,0,0.2)" : "0 2px 12px rgba(0,0,0,0.04)",
+                  opacity: readIds.has(`github_${repo.name}`) ? 0.5 : 1,
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -985,6 +1479,18 @@ export default function TechFeed() {
                       }}>
                         <ExternalLink size={12} /> github.com
                       </span>
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(repo.name, repo.url, `github_${repo.name}`); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 11, color: copiedId === `github_${repo.name}` ? "#10b981" : c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          background: "none", border: "none", cursor: "pointer",
+                          padding: 0, transition: "color 0.2s",
+                        }}
+                      >
+                        {copiedId === `github_${repo.name}` ? <><Check size={12} /> Copied</> : <><Share2 size={12} /> Share</>}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1008,11 +1514,10 @@ export default function TechFeed() {
                   display: "block", textDecoration: "none",
                   background: c.surface,
                   border: `1px solid ${c.borderLight}`,
-                  borderRadius: 14,
-                  padding: "20px 24px",
-                  boxShadow: c.cardShadow,
-                  opacity: readIds.has(`hn_${story.id}`) ? 0.55 : 1,
-                  transition: "all 0.25s cubic-bezier(0.4,0,0.2,1)",
+                  borderRadius: 16,
+                  padding: "22px 26px",
+                  boxShadow: dark ? "0 2px 12px rgba(0,0,0,0.2)" : "0 2px 12px rgba(0,0,0,0.04)",
+                  opacity: readIds.has(`hn_${story.id}`) ? 0.5 : 1,
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
@@ -1097,6 +1602,18 @@ export default function TechFeed() {
                           </Link>
                         </>
                       )}
+                      <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleShare(story.title, story.hnUrl, `hn_${story.id}`); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 4,
+                          fontSize: 11, color: copiedId === `hn_${story.id}` ? "#10b981" : c.textMuted,
+                          fontFamily: "'JetBrains Mono', monospace",
+                          background: "none", border: "none", cursor: "pointer",
+                          padding: 0, transition: "color 0.2s",
+                        }}
+                      >
+                        {copiedId === `hn_${story.id}` ? <><Check size={12} /> Copied</> : <><Share2 size={12} /> Share</>}
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1123,6 +1640,58 @@ export default function TechFeed() {
         {/* Saved items */}
         {source === "saved" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Export buttons */}
+            {savedItems.length > 0 && (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginBottom: 4, position: "relative" }}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    padding: "6px 14px", borderRadius: 8,
+                    border: `1px solid ${c.border}`,
+                    background: dark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+                    color: c.textSecondary, fontSize: 12, fontWeight: 600,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Download size={14} /> Export
+                </button>
+                {showExportMenu && (
+                  <div style={{
+                    position: "absolute", top: "100%", right: 0, marginTop: 4,
+                    background: c.surface, border: `1px solid ${c.borderLight}`,
+                    borderRadius: 10, padding: 6, minWidth: 160,
+                    boxShadow: "0 8px 30px rgba(0,0,0,0.15)", zIndex: 50,
+                  }}>
+                    <button
+                      onClick={() => { exportAsJSON(savedItems); setShowExportMenu(false); }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%",
+                        padding: "10px 14px", borderRadius: 8, border: "none",
+                        background: "transparent", color: c.text,
+                        fontSize: 13, fontWeight: 500, cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif", textAlign: "left",
+                      }}
+                    >
+                      Export as JSON
+                    </button>
+                    <button
+                      onClick={() => { exportAsMarkdown(savedItems); setShowExportMenu(false); }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, width: "100%",
+                        padding: "10px 14px", borderRadius: 8, border: "none",
+                        background: "transparent", color: c.text,
+                        fontSize: 13, fontWeight: 500, cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif", textAlign: "left",
+                      }}
+                    >
+                      Export as Markdown
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             {filteredSaved.length === 0 && (
               <div style={{
                 textAlign: "center", padding: "60px 20px",
@@ -1319,25 +1888,255 @@ export default function TechFeed() {
         )}
       </div>
 
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div
+          onClick={() => setShowShortcuts(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 300,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: c.surface, borderRadius: 16,
+              border: `1px solid ${c.borderLight}`,
+              padding: "32px 28px", maxWidth: 400, width: "100%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+              <h2 style={{
+                fontSize: 18, fontWeight: 700, color: c.text,
+                fontFamily: "'Space Grotesk', sans-serif",
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <Keyboard size={20} /> Keyboard Shortcuts
+              </h2>
+              <button onClick={() => setShowShortcuts(false)} style={{ background: "none", border: "none", cursor: "pointer", color: c.textMuted, padding: 4, display: "flex" }}>
+                <X size={20} />
+              </button>
+            </div>
+            {[
+              ["1 / 2 / 3 / 4", "Switch tabs"],
+              ["J / K", "Navigate posts"],
+              ["R", "Refresh feed"],
+              ["/", "Focus search"],
+              ["?", "Toggle shortcuts"],
+              ["Esc", "Close modals"],
+            ].map(([key, desc]) => (
+              <div key={key} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 0",
+                borderBottom: `1px solid ${c.borderLight}`,
+              }}>
+                <span style={{ fontSize: 13, color: c.textSecondary, fontFamily: "'DM Sans', sans-serif" }}>{desc}</span>
+                <kbd style={{
+                  padding: "4px 10px", borderRadius: 6,
+                  background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                  border: `1px solid ${c.border}`,
+                  fontSize: 12, fontWeight: 600, color: c.text,
+                  fontFamily: "'JetBrains Mono', monospace",
+                }}>{key}</kbd>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div
+          onClick={() => setShowSettings(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 300,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: c.surface, borderRadius: 16,
+              border: `1px solid ${c.borderLight}`,
+              padding: "32px 28px", maxWidth: 480, width: "100%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              maxHeight: "80vh", overflowY: "auto",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+              <h2 style={{
+                fontSize: 20, fontWeight: 700, color: c.text,
+                fontFamily: "'Space Grotesk', sans-serif",
+                display: "flex", alignItems: "center", gap: 8,
+              }}>
+                <Settings size={20} /> Customize Feed
+              </h2>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: c.textMuted, padding: 4, display: "flex",
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Add Subreddit */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{
+                fontSize: 12, fontWeight: 700, color: c.textSecondary,
+                fontFamily: "'JetBrains Mono', monospace",
+                textTransform: "uppercase", letterSpacing: 1,
+                display: "block", marginBottom: 10,
+              }}>Add Subreddit</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="e.g. reactjs"
+                  value={newSubName}
+                  onChange={(e) => setNewSubName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addCustomSub(); }}
+                  style={{
+                    flex: 1, padding: "10px 14px", borderRadius: 8,
+                    border: `1px solid ${c.border}`, background: c.bg,
+                    color: c.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={addCustomSub}
+                  style={{
+                    padding: "10px 18px", borderRadius: 8,
+                    background: c.btnBg, color: c.btnText,
+                    border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 600,
+                  }}
+                >Add</button>
+              </div>
+              {customSubs.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                  {customSubs.map((sub) => (
+                    <span key={sub.name} style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "4px 12px", borderRadius: 16, fontSize: 12,
+                      background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                      color: c.textSecondary, fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      r/{sub.label}
+                      <button
+                        onClick={() => removeCustomSub(sub.name)}
+                        style={{
+                          background: "none", border: "none", cursor: "pointer",
+                          color: c.textMuted, padding: 0, display: "flex", fontSize: 14,
+                        }}
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Add Language */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{
+                fontSize: 12, fontWeight: 700, color: c.textSecondary,
+                fontFamily: "'JetBrains Mono', monospace",
+                textTransform: "uppercase", letterSpacing: 1,
+                display: "block", marginBottom: 10,
+              }}>Add GitHub Language</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="e.g. swift"
+                  value={newLangName}
+                  onChange={(e) => setNewLangName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addCustomLang(); }}
+                  style={{
+                    flex: 1, padding: "10px 14px", borderRadius: 8,
+                    border: `1px solid ${c.border}`, background: c.bg,
+                    color: c.text, fontSize: 14, fontFamily: "'DM Sans', sans-serif",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={addCustomLang}
+                  style={{
+                    padding: "10px 18px", borderRadius: 8,
+                    background: c.btnBg, color: c.btnText,
+                    border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 600,
+                  }}
+                >Add</button>
+              </div>
+              {customLangs.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+                  {customLangs.map((lang) => (
+                    <span key={lang.name} style={{
+                      display: "inline-flex", alignItems: "center", gap: 6,
+                      padding: "4px 12px", borderRadius: 16, fontSize: 12,
+                      background: dark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+                      color: c.textSecondary, fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      {lang.label}
+                      <button
+                        onClick={() => removeCustomLang(lang.name)}
+                        style={{
+                          background: "none", border: "none", cursor: "pointer",
+                          color: c.textMuted, padding: 0, display: "flex", fontSize: 14,
+                        }}
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              fontSize: 12, color: c.textMuted,
+              fontFamily: "'JetBrains Mono', monospace",
+              padding: "12px 0 0",
+              borderTop: `1px solid ${c.borderLight}`,
+            }}>
+              Custom feeds are saved locally in your browser.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back to top button */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         aria-label="Back to top"
+        className="header-btn"
         style={{
           position: "fixed", bottom: 32, right: 32, zIndex: 200,
-          width: 48, height: 48, borderRadius: 14,
-          background: c.btnBg, color: c.btnText,
+          width: 50, height: 50, borderRadius: 16,
+          background: dark
+            ? "linear-gradient(135deg, #f59e0b, #d97706)"
+            : "linear-gradient(135deg, #0f172a, #1e293b)",
+          color: dark ? "#0a0a0f" : "#fff",
           border: "none", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+          boxShadow: dark
+            ? "0 6px 24px rgba(245,158,11,0.3), 0 2px 8px rgba(0,0,0,0.3)"
+            : "0 6px 24px rgba(15,23,42,0.25), 0 2px 8px rgba(0,0,0,0.1)",
           opacity: showTop ? 1 : 0,
           pointerEvents: showTop ? "auto" : "none",
-          transform: showTop ? "translateY(0)" : "translateY(16px)",
-          transition: "opacity 0.3s, transform 0.3s",
+          transform: showTop ? "translateY(0) scale(1)" : "translateY(20px) scale(0.9)",
+          transition: "opacity 0.4s cubic-bezier(0.22,1,0.36,1), transform 0.4s cubic-bezier(0.22,1,0.36,1)",
         }}
       >
-        <ArrowUp size={20} />
+        <ArrowUp size={20} strokeWidth={2.5} />
       </button>
+
+      {/* Onboarding Tour */}
+      <Onboarding dark={dark} colors={c} />
     </div>
   );
 }
