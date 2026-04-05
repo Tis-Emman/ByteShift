@@ -279,7 +279,9 @@ export default function TechFeed() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/reddit?sub=${sub}&sort=${sortBy}`);
+      const res = await fetch(`https://www.reddit.com/r/${sub}/${sortBy}.json?limit=25`, {
+        headers: { "Accept": "application/json" },
+      });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setPosts(parseRedditItems(data));
@@ -294,7 +296,9 @@ export default function TechFeed() {
     if (loadingMore || !redditAfter || source !== "reddit") return;
     setLoadingMore(true);
     try {
-      const res = await fetch(`/api/reddit?sub=${activeSub}&sort=${sort}&after=${redditAfter}`);
+      const res = await fetch(`https://www.reddit.com/r/${activeSub}/${sort}.json?limit=25&after=${redditAfter}`, {
+        headers: { "Accept": "application/json" },
+      });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       const newItems = parseRedditItems(data);

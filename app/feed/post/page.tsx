@@ -167,7 +167,9 @@ function PostViewer() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/reddit/post?permalink=${encodeURIComponent(permalink)}`);
+        const res = await fetch(`https://www.reddit.com${permalink}.json?limit=50`, {
+          headers: { "Accept": "application/json" },
+        });
         if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
 

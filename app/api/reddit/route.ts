@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRedditToken } from "./token";
 
 export async function GET(req: NextRequest) {
   const sub = req.nextUrl.searchParams.get("sub") || "technology";
@@ -6,19 +7,23 @@ export async function GET(req: NextRequest) {
   const after = req.nextUrl.searchParams.get("after") || "";
 
   try {
-    const res = await fetch(
-      `https://www.reddit.com/r/${sub}/${sort}.json?limit=25${after ? `&after=${after}` : ""}`,
-      {
-        headers: {
-          "User-Agent": "ByteShift/1.0 (tech feed aggregator)",
-        },
-        next: { revalidate: 120 },
-      }
-    );
+    const token = await getRedditToken();
+    const headers: Record<string, string> = {
+      "User-Agent": "ByteShift/1.0 (tech feed aggregator)",
+    };
+    let url: string;
+    if (token) {
+      headers["Authorization"] = `bearer ${token}`;
+      url = `https://oauth.reddit.com/r/${sub}/${sort}.json?limit=25${after ? `&after=${after}` : ""}`;
+    } else {
+      url = `https://www.reddit.com/r/${sub}/${sort}.json?limit=25${after ? `&after=${after}` : ""}`;
+    }
+
+    const res = await fetch(url, { headers, next: { revalidate: 120 } });
 
     if (!res.ok) {
       return NextResponse.json(
-        { error: "Reddit API returned an error" },
+        { error: "Reddit API returned an error", status: res.status },
         { status: res.status }
       );
     }

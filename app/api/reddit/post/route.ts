@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRedditToken } from "../token";
 
 export async function GET(req: NextRequest) {
   const permalink = req.nextUrl.searchParams.get("permalink");
@@ -8,15 +9,19 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(
-      `https://www.reddit.com${permalink}.json?limit=50`,
-      {
-        headers: {
-          "User-Agent": "ByteShift/1.0 (tech feed aggregator)",
-        },
-        next: { revalidate: 60 },
-      }
-    );
+    const token = await getRedditToken();
+    const headers: Record<string, string> = {
+      "User-Agent": "ByteShift/1.0 (tech feed aggregator)",
+    };
+    let url: string;
+    if (token) {
+      headers["Authorization"] = `bearer ${token}`;
+      url = `https://oauth.reddit.com${permalink}.json?limit=50`;
+    } else {
+      url = `https://www.reddit.com${permalink}.json?limit=50`;
+    }
+
+    const res = await fetch(url, { headers, next: { revalidate: 60 } });
 
     if (!res.ok) {
       return NextResponse.json(
