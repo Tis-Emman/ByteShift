@@ -524,13 +524,6 @@ export default function TechBlogHome() {
           >
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <a href="/signup" style={{
-            padding: "8px 20px", borderRadius: 8,
-            background: c.btnBg, color: c.btnText,
-            fontSize: 13.5, fontWeight: 600, textDecoration: "none",
-            fontFamily: "'DM Sans', sans-serif",
-            transition: "all 0.3s",
-          }}>Get Started</a>
         </div>
 
         {/* Mobile menu buttons */}
@@ -551,12 +544,6 @@ export default function TechBlogHome() {
             <a key={l} href={`#${l === "Trending" ? "news" : l.toLowerCase().replace(" ", "-")}`} className="nav-link" onClick={() => setMobileMenu(false)}>{l}</a>
           ))}
           <a href="/feed" className="nav-link" onClick={() => setMobileMenu(false)}>Tech Feed</a>
-          <a href="/signup" onClick={() => setMobileMenu(false)} style={{
-            marginTop: 16, padding: "14px 24px", borderRadius: 10,
-            background: c.btnBg, color: c.btnText,
-            fontSize: 15, fontWeight: 700, textDecoration: "none",
-            fontFamily: "'DM Sans', sans-serif", textAlign: "center",
-          }}>Get Started</a>
         </div>
       )}
 
