@@ -1303,18 +1303,18 @@ export default function TechFeed() {
                           }}>
                             <ExternalLink size={12} /> {post.domain}
                           </span>
-                          <Link
-                            href={`/reader?url=${encodeURIComponent(post.url)}`}
-                            onClick={(e) => { e.stopPropagation(); handlePostClick(`reddit_${post.id}`); }}
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePostClick(`reddit_${post.id}`); window.location.href = `/reader?url=${encodeURIComponent(post.url)}`; }}
                             style={{
                               display: "flex", alignItems: "center", gap: 4,
                               fontSize: 11, color: dark ? "#f59e0b" : "#3b82f6",
                               fontFamily: "'JetBrains Mono', monospace",
-                              textDecoration: "none", fontWeight: 600,
+                              background: "none", border: "none", cursor: "pointer",
+                              padding: 0, fontWeight: 600,
                             }}
                           >
                             <BookOpen size={12} /> Reader
-                          </Link>
+                          </button>
                         </>
                       )}
                       <button
@@ -1588,18 +1588,18 @@ export default function TechFeed() {
                           }}>
                             <ExternalLink size={12} /> {story.domain}
                           </span>
-                          <Link
-                            href={`/reader?url=${encodeURIComponent(story.url)}`}
-                            onClick={(e) => { e.stopPropagation(); handlePostClick(`hn_${story.id}`); }}
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); handlePostClick(`hn_${story.id}`); window.location.href = `/reader?url=${encodeURIComponent(story.url)}`; }}
                             style={{
                               display: "flex", alignItems: "center", gap: 4,
                               fontSize: 11, color: dark ? "#f59e0b" : "#3b82f6",
                               fontFamily: "'JetBrains Mono', monospace",
-                              textDecoration: "none", fontWeight: 600,
+                              background: "none", border: "none", cursor: "pointer",
+                              padding: 0, fontWeight: 600,
                             }}
                           >
                             <BookOpen size={12} /> Reader
-                          </Link>
+                          </button>
                         </>
                       )}
                       <button
